@@ -1,0 +1,68 @@
+# ==============================================================================
+# Frontend CI/CD Pipeline
+# 
+# This workflow automatically builds and deploys the frontend application to Cloud Run.
+# It uses Workload Identity Federation (WIF) for passwordless authentication.
+# 
+# Triggers: 
+# - Pushes to the `main` branch that modify files in the `frontend/` directory.
+# ==============================================================================
+
+name: Deploy Frontend to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+env:
+  PROJECT_ID: 'intelllexosv91'
+  REGION: 'europe-west1'
+  REPO_NAME: 'intellaxis-auth' 
+  SERVICE_NAME: 'intellaxis-auth-frontend'
+  WIF_PROVIDER: 'projects/1001306903031/locations/global/workloadIdentityPools/github-actions-pool-tf/providers/github-provider-tf'
+  WIF_SERVICE_ACCOUNT: 'intellaxis-auth-deployer@intelllexosv91.iam.gserviceaccount.com'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    # Required for Workload Identity Federation
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: '${{ env.WIF_PROVIDER }}'
+          service_account: '${{ env.WIF_SERVICE_ACCOUNT }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Authorize Docker push to Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          cd frontend
+          docker build --build-arg NEXT_PUBLIC_API_URL=https://intellaxis-auth-backend-1001306903031.europe-west1.run.app -t $IMAGE .
+          docker push $IMAGE
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          flags: '--allow-unauthenticated --port=3000'
