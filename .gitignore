@@ -3,3 +3,26 @@
 *.tfstate
 *.tfstate.backup
 .terraform.tfstate.lock.info
+
+# Node
+node_modules/
+dist/
+.next/
+out/
+build/
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+venv/
+ENV/
+env.bak/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db

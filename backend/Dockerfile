@@ -17,5 +17,5 @@ COPY . .
 # Expose the application port
 EXPOSE 8000
 
-# Run the FastAPI server using the uv run command
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run migrations and start the FastAPI server
+CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn main:app --host 0.0.0.0 --port 8000"]

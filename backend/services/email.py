@@ -1,0 +1,77 @@
+import httpx
+from core.config import settings
+
+class BaseEmailService:
+    async def send_verification_email(self, to_email: str, token: str):
+        raise NotImplementedError
+        
+    async def send_password_reset_email(self, to_email: str, token: str):
+        raise NotImplementedError
+
+class ConsoleEmailService(BaseEmailService):
+    async def send_verification_email(self, to_email: str, token: str):
+        print("="*50)
+        print(f"📧 EMAIL VERIFICATION TO: {to_email}")
+        print(f"🔑 TOKEN: {token}")
+        print("="*50)
+        
+    async def send_password_reset_email(self, to_email: str, token: str):
+        print("="*50)
+        print(f"📧 PASSWORD RESET TO: {to_email}")
+        print(f"🔑 TOKEN: {token}")
+        print("="*50)
+
+class ZeptoMailService(BaseEmailService):
+    def __init__(self, api_key: str, from_address: str):
+        self.api_url = "https://api.zeptomail.in/v1.1/email"
+        self.api_key = api_key
+        self.from_address = from_address
+        
+    async def _send_email(self, to_email: str, subject: str, htmlbody: str):
+        if not self.api_key or not self.from_address:
+            print(f"⚠️ ZEPTOMAIL SKIPPED (Missing API Key). Would have sent to {to_email}")
+            return
+            
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Zoho-enczapikey {self.api_key}"
+        }
+        payload = {
+            "from": {"address": self.from_address},
+            "to": [{"email_address": {"address": to_email}}],
+            "subject": subject,
+            "htmlbody": htmlbody
+        }
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(self.api_url, json=payload, headers=headers)
+                response.raise_for_status()
+                print(f"✅ ZeptoMail successfully sent to {to_email}")
+            except Exception as e:
+                print(f"❌ ZeptoMail failed to send to {to_email}: {str(e)}")
+
+    async def send_verification_email(self, to_email: str, token: str):
+        # In a real app, this would be a link to the frontend
+        htmlbody = f"<div><b>Your verification token is: {token}</b></div>"
+        await self._send_email(to_email, "Verify Your Email", htmlbody)
+
+    async def send_password_reset_email(self, to_email: str, token: str):
+        # In a real app, this would be a link to the frontend
+        htmlbody = f"<div><b>Your password reset token is: {token}</b></div>"
+        await self._send_email(to_email, "Reset Your Password", htmlbody)
+
+from fastapi import Depends
+from models.project import Project
+from api.deps import get_project_from_api_key
+
+async def get_email_service(project: Project = Depends(get_project_from_api_key)) -> BaseEmailService:
+    if project.mail_provider == "zeptomail":
+        if project.zeptomail_api_key and project.zeptomail_from_address:
+            return ZeptoMailService(project.zeptomail_api_key, project.zeptomail_from_address)
+        else:
+            print(f"⚠️ ZeptoMail selected as active provider for project {project.id} but API keys are missing! Falling back to console.")
+        
+    # Fallback to local console print if not configured or explicitly set to console
+    return ConsoleEmailService()
