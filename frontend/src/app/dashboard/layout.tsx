@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Loader2, LayoutDashboard, User, Book, LogOut, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useAppTitle } from "@/hooks/useAppTitle";
+import { apiFetch } from "@/lib/api";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [developer, setDeveloper] = useState<any>(null);
@@ -16,16 +17,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const fetchDev = async () => {
-      const token = localStorage.getItem("developer_token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await apiFetch("/api/developer/auth/me");
         
         if (!res.ok) {
           throw new Error("Unauthorized");
@@ -46,6 +39,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleLogout = () => {
     localStorage.removeItem("developer_token");
+    localStorage.removeItem("developer_refresh_token");
     router.push("/login");
   };
 

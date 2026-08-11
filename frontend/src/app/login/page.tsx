@@ -59,9 +59,11 @@ export default function DeveloperLoginPage() {
       
       if (data.role === "admin") {
           localStorage.setItem("admin_token", data.access_token);
+          localStorage.setItem("admin_refresh_token", data.refresh_token);
           router.push("/admin");
       } else {
           localStorage.setItem("developer_token", data.access_token);
+          localStorage.setItem("developer_refresh_token", data.refresh_token);
           router.push("/dashboard");
       }
     } catch (err: any) {

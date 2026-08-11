@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
@@ -10,14 +10,19 @@ from models.developer import Developer
 from models.project import Project
 from schemas.developer import DeveloperCreate, DeveloperLogin, DeveloperResponse, DeveloperPasswordUpdate
 from schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
-from schemas.user import Token
-from core.security import get_password_hash, verify_password, create_access_token
+from schemas.user import Token, RefreshRequest
+from core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, ALGORITHM
+from core.config import settings
+from jose import jwt, JWTError
 from api.deps import get_current_developer
+from core.rate_limit import limiter
 
 developer_router = APIRouter(prefix="/developer", tags=["developer"])
 
 @developer_router.post("/auth/register", response_model=DeveloperResponse)
+@limiter.limit("5/minute")
 async def register_developer(
+    request: Request,
     dev_in: DeveloperCreate, 
     db: AsyncSession = Depends(get_db)
 ) -> Any:
@@ -39,7 +44,9 @@ async def register_developer(
         )
 
 @developer_router.post("/auth/login")
+@limiter.limit("5/minute")
 async def login_developer_or_admin(
+    request: Request,
     dev_in: DeveloperLogin, 
     db: AsyncSession = Depends(get_db)
 ) -> Any:
@@ -54,7 +61,8 @@ async def login_developer_or_admin(
             subject=admin.id, 
             extra_claims={"role": "admin"}
         )
-        return {"access_token": access_token, "token_type": "bearer", "role": "admin"}
+        refresh_token = create_refresh_token(subject=admin.id, extra_claims={"role": "admin"})
+        return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token, "role": "admin"}
         
     # Check Developer
     result = await db.execute(select(Developer).where(Developer.email == dev_in.email))
@@ -76,7 +84,33 @@ async def login_developer_or_admin(
         subject=dev.id, 
         extra_claims={"role": "developer"}
     )
-    return {"access_token": access_token, "token_type": "bearer", "role": "developer"}
+    refresh_token = create_refresh_token(subject=dev.id, extra_claims={"role": "developer"})
+    return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token, "role": "developer"}
+
+@developer_router.post("/auth/refresh", response_model=Token)
+@limiter.limit("5/minute")
+async def refresh_developer_token(
+    request: Request,
+    refresh_req: RefreshRequest,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    try:
+        payload = jwt.decode(refresh_req.refresh_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        subject = payload.get("sub")
+        role = payload.get("role")
+        if not subject or not role:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+            
+        access_token = create_access_token(
+            subject=subject, 
+            extra_claims={"role": role}
+        )
+        return {"access_token": access_token, "token_type": "bearer"}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 @developer_router.get("/auth/me", response_model=DeveloperResponse)
 async def get_me(current_dev: Developer = Depends(get_current_developer)) -> Any:

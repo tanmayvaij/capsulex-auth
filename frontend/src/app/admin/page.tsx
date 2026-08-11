@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Users, FolderOpen, User, Trash2, ArrowUpRight, ArrowDownRight, ShieldCheck, Eye, X, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({ developers: 0, projects: 0, users: 0 });
@@ -17,20 +18,11 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     const fetchAdminData = async () => {
-      const token = localStorage.getItem("admin_token");
-      if (!token) return;
-
       try {
         const [statsRes, devsRes, projsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/stats`, {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/developers`, {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/projects`, {
-            headers: { Authorization: `Bearer ${token}` }
-          })
+          apiFetch("/api/admin/auth/stats", { role: "admin" }),
+          apiFetch("/api/admin/auth/developers", { role: "admin" }),
+          apiFetch("/api/admin/auth/projects", { role: "admin" })
         ]);
 
         if (statsRes.ok && devsRes.ok && projsRes.ok) {
@@ -49,12 +41,11 @@ export default function AdminDashboardPage() {
   }, []);
 
   const handleToggleDevStatus = async (devId: number, currentStatus: boolean) => {
-    const token = localStorage.getItem("admin_token");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/developers/${devId}/status`, {
+      const res = await apiFetch(`/api/admin/auth/developers/${devId}/status`, {
         method: "PATCH",
+        role: "admin",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ is_active: !currentStatus })
@@ -71,16 +62,11 @@ export default function AdminDashboardPage() {
   };
 
   const handleDeleteDeveloper = async (devId: number) => {
-    const token = localStorage.getItem("admin_token");
-    if (!token) return;
-
     setIsDeleting(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/developers/${devId}`, {
+      const res = await apiFetch(`/api/admin/auth/developers/${devId}`, {
         method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+        role: "admin"
       });
       
       if (res.ok) {
@@ -106,11 +92,8 @@ export default function AdminDashboardPage() {
   const handleViewUsers = async (project: any) => {
     setSelectedProjectForUsers(project);
     setLoadingUsers(true);
-    const token = localStorage.getItem("admin_token");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/projects/${project.id}/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiFetch(`/api/admin/auth/projects/${project.id}/users`, { role: "admin" });
       if (res.ok) {
         setProjectUsers(await res.json());
       }

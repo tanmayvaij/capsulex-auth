@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function AdminDevelopersPage() {
   const [developers, setDevelopers] = useState<any[]>([]);
@@ -14,12 +15,8 @@ export default function AdminDevelopersPage() {
   const itemsPerPage = 10;
 
   const fetchDevelopers = async () => {
-    const token = localStorage.getItem("admin_token");
-    if (!token) return;
     try {
-      const devsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/developers`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const devsRes = await apiFetch("/api/admin/auth/developers", { role: "admin" });
       if (devsRes.ok) {
         setDevelopers(await devsRes.json());
       }
@@ -35,13 +32,12 @@ export default function AdminDevelopersPage() {
   }, []);
 
   const handleToggleDevStatus = async (devId: number, currentStatus: boolean) => {
-    const token = localStorage.getItem("admin_token");
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/developers/${devId}/status`, {
+      await apiFetch(`/api/admin/auth/developers/${devId}/status`, {
         method: "PATCH",
+        role: "admin",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ is_active: !currentStatus })
       });
@@ -53,11 +49,10 @@ export default function AdminDevelopersPage() {
 
   const handleDeleteDeveloper = async (devId: number) => {
     setIsDeleting(true);
-    const token = localStorage.getItem("admin_token");
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/developers/${devId}`, {
+      await apiFetch(`/api/admin/auth/developers/${devId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+        role: "admin"
       });
       fetchDevelopers();
     } catch (error) {

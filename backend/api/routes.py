@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_
@@ -10,17 +10,19 @@ from db.session import get_db
 from schemas.user import (
     UserCreate, UserLogin, UserResponse, Token, UserAdminResponse, 
     UserStatusUpdate, VerifyEmailRequest, ForgotPasswordRequest, ResetPasswordRequest,
-    SendVerificationEmailRequest
+    SendVerificationEmailRequest, RefreshRequest
 )
 from schemas.project import ProjectCreate, ProjectResponse, AdminProjectResponse
 from models.user import User
 from models.project import Project
 from models.admin import Admin
 from schemas.admin import AdminLogin, AdminResponse, AdminPasswordUpdate, AdminSettingsUpdate, AdminSetup
-from core.security import get_password_hash, verify_password, create_access_token
+from core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, ALGORITHM
+from jose import jwt, JWTError
 from core.config import settings
 from api.deps import get_current_user, get_project_from_api_key, get_current_admin
 from services.email import get_email_service, BaseEmailService
+from core.rate_limit import limiter
 
 router = APIRouter()
 
@@ -28,7 +30,9 @@ router = APIRouter()
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 @auth_router.post("/register", response_model=UserResponse)
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     user_in: UserCreate, 
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key)
@@ -56,7 +60,9 @@ async def register(
         )
 
 @auth_router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     user_in: UserLogin, 
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key)
@@ -85,14 +91,38 @@ async def login(
     await db.commit()
     
     access_token = create_access_token(subject=user.id)
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = create_refresh_token(subject=user.id)
+    return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token}
+
+@auth_router.post("/refresh", response_model=Token)
+@limiter.limit("5/minute")
+async def refresh_user_token(
+    request: Request,
+    refresh_req: RefreshRequest,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    try:
+        payload = jwt.decode(refresh_req.refresh_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        subject = payload.get("sub")
+        if not subject:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+            
+        access_token = create_access_token(subject=subject)
+        return {"access_token": access_token, "token_type": "bearer"}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 @auth_router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)) -> Any:
     return current_user
 
 @auth_router.post("/send-verification-email")
+@limiter.limit("3/minute")
 async def send_verification_email(
+    request: Request,
     req: SendVerificationEmailRequest,
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key),
@@ -118,7 +148,9 @@ async def send_verification_email(
     return {"message": "If the user exists, a verification email has been sent."}
 
 @auth_router.post("/verify-email")
+@limiter.limit("3/minute")
 async def verify_email(
+    request: Request,
     req: VerifyEmailRequest,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
@@ -133,7 +165,9 @@ async def verify_email(
     return {"message": "Email verified successfully"}
 
 @auth_router.post("/forgot-password")
+@limiter.limit("3/minute")
 async def forgot_password(
+    request: Request,
     req: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key),
@@ -155,7 +189,9 @@ async def forgot_password(
     return {"message": "If that email is registered, a password reset link has been sent."}
 
 @auth_router.post("/reset-password")
+@limiter.limit("3/minute")
 async def reset_password(
+    request: Request,
     req: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
@@ -213,7 +249,9 @@ async def setup_admin(
     return {"message": "Admin created successfully"}
 
 @admin_auth_router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 async def admin_login(
+    request: Request,
     admin_in: AdminLogin, 
     db: AsyncSession = Depends(get_db),
 ) -> Any:
@@ -227,7 +265,30 @@ async def admin_login(
         )
     
     access_token = create_access_token(subject=admin.id, extra_claims={"role": "admin"})
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = create_refresh_token(subject=admin.id, extra_claims={"role": "admin"})
+    return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token}
+
+@admin_auth_router.post("/refresh", response_model=Token)
+@limiter.limit("5/minute")
+async def refresh_admin_token(
+    request: Request,
+    refresh_req: RefreshRequest,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    try:
+        payload = jwt.decode(refresh_req.refresh_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        subject = payload.get("sub")
+        role = payload.get("role")
+        if not subject or role != "admin":
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+            
+        access_token = create_access_token(subject=subject, extra_claims={"role": "admin"})
+        return {"access_token": access_token, "token_type": "bearer"}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 @admin_auth_router.get("/stats")
 async def get_admin_stats(

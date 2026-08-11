@@ -26,6 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = () => {
     localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_refresh_token");
     router.push("/login");
   };
 

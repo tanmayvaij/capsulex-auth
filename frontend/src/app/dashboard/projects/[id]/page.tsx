@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Trash2, Search, ChevronLeft, ChevronRight, CheckCircle, XCircle, CheckCircle2, Circle, EyeOff, Eye, Globe, Mail, Users as UsersIcon, Plus } from "lucide-react";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
 export default function ProjectUsersPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -38,18 +39,12 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = localStorage.getItem("developer_token");
-      if (!token) return;
       if (!id) return;
 
       try {
         const [projectRes, usersRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects/${id}/users`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
+          apiFetch(`/api/developer/projects/${id}`),
+          apiFetch(`/api/developer/projects/${id}/users`)
         ]);
 
         if (!projectRes.ok) {
@@ -80,13 +75,11 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
   const handleMailConfigSave = async () => {
     setMailLoading(true);
     setMailSuccess("");
-    const token = localStorage.getItem("developer_token");
     try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects/${id}`, {
+        const res = await apiFetch(`/api/developer/projects/${id}`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({
                 mail_provider: mailConfig.provider,
@@ -108,13 +101,9 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
     
-    const token = localStorage.getItem("developer_token");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects/${id}/users/${userId}`, {
+      const res = await apiFetch(`/api/developer/projects/${id}/users/${userId}`, {
         method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
       });
       
       if (res.ok) {
@@ -126,12 +115,10 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
   };
 
   const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
-    const token = localStorage.getItem("developer_token");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects/${id}/users/${userId}/status`, {
+      const res = await apiFetch(`/api/developer/projects/${id}/users/${userId}/status`, {
         method: "PATCH",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ is_active: !currentStatus })
@@ -207,15 +194,13 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
                 }
                 
                 const updatedOrigins = [...currentOrigins, originToAdd];
-                const token = localStorage.getItem("developer_token");
                 
                 setCorsLoading(true);
                 try {
-                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects/${id}`, {
+                    const res = await apiFetch(`/api/developer/projects/${id}`, {
                         method: "PATCH",
                         headers: {
                             "Content-Type": "application/json",
-                            "Authorization": `Bearer ${token}`
                         },
                         body: JSON.stringify({ allowed_origins: updatedOrigins })
                     });
@@ -260,15 +245,13 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
                     <button
                       onClick={async () => {
                         const updatedOrigins = project.allowed_origins.filter((o: string) => o !== origin);
-                        const token = localStorage.getItem("developer_token");
                         
                         setCorsLoading(true);
                         try {
-                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects/${id}`, {
+                            const res = await apiFetch(`/api/developer/projects/${id}`, {
                                 method: "PATCH",
                                 headers: {
                                     "Content-Type": "application/json",
-                                    "Authorization": `Bearer ${token}`
                                 },
                                 body: JSON.stringify({ allowed_origins: updatedOrigins })
                             });

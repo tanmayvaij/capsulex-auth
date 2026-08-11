@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2, ArrowLeft, ShieldCheck, LogOut, CheckCircle2, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
 export default function DeveloperProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -15,12 +16,8 @@ export default function DeveloperProfilePage() {
 
   useEffect(() => {
     const fetchDev = async () => {
-      const token = localStorage.getItem("developer_token");
-      if (!token) return;
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await apiFetch("/api/developer/auth/me");
         if (res.ok) {
           setDeveloper(await res.json());
         }
@@ -57,13 +54,10 @@ export default function DeveloperProfilePage() {
     }
 
     setLoading(true);
-    const token = localStorage.getItem("developer_token");
-    
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/password`, {
+      const res = await apiFetch("/api/developer/auth/password", {
         method: "PATCH",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({

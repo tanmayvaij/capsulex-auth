@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck, Users, Eye, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -15,12 +16,8 @@ export default function AdminProjectsPage() {
   const itemsPerPage = 10;
 
   const fetchProjects = async () => {
-    const token = localStorage.getItem("admin_token");
-    if (!token) return;
     try {
-      const projsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/projects`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const projsRes = await apiFetch("/api/admin/auth/projects", { role: "admin" });
       if (projsRes.ok) {
         setProjects(await projsRes.json());
       }
@@ -38,11 +35,8 @@ export default function AdminProjectsPage() {
   const handleViewUsers = async (project: any) => {
     setSelectedProjectForUsers(project);
     setLoadingUsers(true);
-    const token = localStorage.getItem("admin_token");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/projects/${project.id}/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiFetch(`/api/admin/auth/projects/${project.id}/users`, { role: "admin" });
       if (res.ok) {
         setProjectUsers(await res.json());
       }

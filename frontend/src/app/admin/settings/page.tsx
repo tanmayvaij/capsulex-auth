@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2, ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAppTitle } from "@/hooks/useAppTitle";
+import { apiFetch } from "@/lib/api";
 
 export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -38,13 +39,11 @@ export default function SettingsPage() {
     }
 
     setLoading(true);
-    const token = localStorage.getItem("admin_token");
-    
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/password`, {
+      const res = await apiFetch("/api/admin/auth/password", {
         method: "PATCH",
+        role: "admin",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({

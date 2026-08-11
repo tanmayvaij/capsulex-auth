@@ -2,9 +2,10 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Users, ChevronLeft, ShieldCheck, Settings, LogOut, CheckCircle2, Circle } from "lucide-react";
 import Link from "next/link";
+import { Loader2, Users, ChevronLeft, ShieldCheck, Settings, LogOut, CheckCircle2, Circle } from "lucide-react";
 import { useAppTitle } from "@/hooks/useAppTitle";
+import { apiFetch } from "@/lib/api";
 
 export default function AdminProjectUsersPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -15,18 +16,10 @@ export default function AdminProjectUsersPage({ params }: { params: Promise<{ id
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const token = localStorage.getItem("admin_token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
       if (!id) return;
 
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/projects/${id}/users`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await apiFetch(`/api/admin/auth/projects/${id}/users`, { role: "admin" });
 
         if (res.ok) {
           setUsers(await res.json());
@@ -43,6 +36,7 @@ export default function AdminProjectUsersPage({ params }: { params: Promise<{ id
 
   const handleLogout = () => {
     localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_refresh_token");
     router.push("/login");
   };
 

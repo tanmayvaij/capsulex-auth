@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Copy, CheckCircle2, Trash2, Users, LayoutDashboard, ChevronRight, BarChart3, Fingerprint } from "lucide-react";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
 export default function DeveloperDashboardPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -17,13 +18,8 @@ export default function DeveloperDashboardPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = localStorage.getItem("developer_token");
-      if (!token) return;
-
       try {
-        const projectsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const projectsRes = await apiFetch("/api/developer/projects");
 
         if (!projectsRes.ok) return;
         
@@ -43,14 +39,12 @@ export default function DeveloperDashboardPage() {
     e.preventDefault();
     if (!newProjectName.trim()) return;
 
-    const token = localStorage.getItem("developer_token");
     setCreatingProject(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects`, {
+      const res = await apiFetch("/api/developer/projects", {
         method: "POST",
         headers: { 
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ name: newProjectName }),
       });
@@ -75,13 +69,9 @@ export default function DeveloperDashboardPage() {
     if (!projectToDelete) return;
     
     setIsDeleting(true);
-    const token = localStorage.getItem("developer_token");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/projects/${projectToDelete.id}`, {
+      const res = await apiFetch(`/api/developer/projects/${projectToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
       });
       
       if (res.ok) {

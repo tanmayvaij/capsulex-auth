@@ -82,6 +82,7 @@ export default function AdminSetupPage() {
       if (loginRes.ok) {
         const data = await loginRes.json();
         localStorage.setItem("admin_token", data.access_token);
+        localStorage.setItem("admin_refresh_token", data.refresh_token);
         setSuccess(true);
         setTimeout(() => {
           router.push("/admin");

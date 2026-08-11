@@ -55,6 +55,7 @@ export default function DeveloperRegisterPage() {
       
       const loginData = await loginRes.json();
       localStorage.setItem("developer_token", loginData.access_token);
+      localStorage.setItem("developer_refresh_token", loginData.refresh_token);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message);
