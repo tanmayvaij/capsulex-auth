@@ -1,16 +1,16 @@
 {
-  "name": "@intellaxis/auth",
+  "name": "@capsulex/auth",
   "version": "1.0.0",
-  "description": "Official JavaScript/TypeScript SDK for Intellaxis Auth",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "Official JavaScript/TypeScript SDK for Capsulex Auth",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "node dist/test.js"
   },
   "keywords": [
-    "intellaxis",
     "auth",
+    "capsulex",
     "authentication",
     "sdk"
   ],

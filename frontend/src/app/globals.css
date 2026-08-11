@@ -7,6 +7,12 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   
@@ -33,22 +39,22 @@
 
 @layer base {
   :root {
-    --background: #111111;
+    --background: #09090b;
     --foreground: #fafafa;
     
-    --card: #151515;
+    --card: #09090b;
     --card-foreground: #fafafa;
     
-    --popover: #151515;
+    --popover: #09090b;
     --popover-foreground: #fafafa;
     
-    --primary: #00a896;
+    --primary: #0d9488;
     --primary-foreground: #ffffff;
     
     --secondary: #27272a;
     --secondary-foreground: #fafafa;
     
-    --muted: #27272a;
+    --muted: #1f1f22;
     --muted-foreground: #a1a1aa;
     
     --accent: #27272a;
@@ -59,9 +65,9 @@
     
     --border: #27272a;
     --input: #27272a;
-    --ring: #00a896;
+    --ring: #0d9488;
     
-    --radius: 0.5rem;
+    --radius: 1rem;
   }
 }
 
@@ -73,4 +79,34 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
   }
+  button, [role="button"], a {
+    @apply cursor-pointer;
+  }
+  button:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #27272a transparent;
 }

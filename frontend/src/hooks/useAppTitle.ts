@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 export function useAppTitle() {
-  const [title, setTitle] = useState("Intellaxis Auth Admin");
+  const [title, setTitle] = useState("Capsulex Auth Admin");
 
   useEffect(() => {
     // Initial load

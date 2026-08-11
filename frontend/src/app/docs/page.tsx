@@ -9,34 +9,8 @@ export default function DocsPage() {
   const { title } = useAppTitle();
   const [activeTab, setActiveTab] = useState<'fetch' | 'axios' | 'sdk'>('sdk');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [developer, setDeveloper] = useState<any>(null);
-
-  useEffect(() => {
-    const fetchDev = async () => {
-      const token = localStorage.getItem("developer_token");
-      if (token) {
-        try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setDeveloper(data);
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
-    };
-    fetchDev();
-  }, []);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-  const handleLogout = () => {
-    localStorage.removeItem("developer_token");
-    window.location.href = "/login";
-  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -287,18 +261,18 @@ const resetPassword = async (token, new_password) => {
       }
     } else if (activeTab === 'sdk') {
       if (method === 'register') {
-        return `import { IntellaxisAuth } from '@intellaxis/auth';
+        return `import { CapsulexAuth } from '@capsulex/auth';
 
-const auth = new IntellaxisAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
+const auth = new CapsulexAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
 
 const registerUser = async (email, password) => {
   return await auth.register(email, password);
 };`;
       }
       if (method === 'login') {
-        return `import { IntellaxisAuth } from '@intellaxis/auth';
+        return `import { CapsulexAuth } from '@capsulex/auth';
 
-const auth = new IntellaxisAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
+const auth = new CapsulexAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
 
 const loginUser = async (email, password) => {
   // SDK automatically stores token in localStorage
@@ -306,9 +280,9 @@ const loginUser = async (email, password) => {
 };`;
       }
       if (method === 'me') {
-        return `import { IntellaxisAuth } from '@intellaxis/auth';
+        return `import { CapsulexAuth } from '@capsulex/auth';
 
-const auth = new IntellaxisAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
+const auth = new CapsulexAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
 
 const getCurrentUser = async () => {
   // SDK automatically reads token from localStorage and injects it
@@ -316,36 +290,36 @@ const getCurrentUser = async () => {
 };`;
       }
       if (method === 'send-verification-email') {
-        return `import { IntellaxisAuth } from '@intellaxis/auth';
+        return `import { CapsulexAuth } from '@capsulex/auth';
 
-const auth = new IntellaxisAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
+const auth = new CapsulexAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
 
 const sendVerificationEmail = async (email) => {
   return await auth.sendVerificationEmail(email);
 };`;
       }
       if (method === 'verify-email') {
-        return `import { IntellaxisAuth } from '@intellaxis/auth';
+        return `import { CapsulexAuth } from '@capsulex/auth';
 
-const auth = new IntellaxisAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
+const auth = new CapsulexAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
 
 const verifyEmail = async (token) => {
   return await auth.verifyEmail(token);
 };`;
       }
       if (method === 'forgot-password') {
-        return `import { IntellaxisAuth } from '@intellaxis/auth';
+        return `import { CapsulexAuth } from '@capsulex/auth';
 
-const auth = new IntellaxisAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
+const auth = new CapsulexAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
 
 const forgotPassword = async (email) => {
   return await auth.forgotPassword(email);
 };`;
       }
       if (method === 'reset-password') {
-        return `import { IntellaxisAuth } from '@intellaxis/auth';
+        return `import { CapsulexAuth } from '@capsulex/auth';
 
-const auth = new IntellaxisAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
+const auth = new CapsulexAuth('proj_YOUR_API_KEY_HERE', { baseUrl: "${API_URL}" });
 
 const resetPassword = async (token, new_password) => {
   return await auth.resetPassword(token, new_password);
@@ -357,10 +331,10 @@ const resetPassword = async (token, new_password) => {
 
   return (
     <div className="min-h-screen w-full bg-background flex flex-col">
-      <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="sticky top-0 z-50 w-full border-b border-border bg-background">
         <div className="flex h-16 items-center px-8 justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="mr-2 p-2 hover:bg-accent rounded-full transition-colors text-muted-foreground hover:text-foreground">
+            <Link href="/" className="mr-2 p-2 hover:bg-accent rounded-full transition-colors text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-primary bg-primary/10">
@@ -371,32 +345,19 @@ const resetPassword = async (token, new_password) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {developer && (
-              <span className="text-sm text-muted-foreground mr-4 hidden md:inline-block">
-                {developer.email}
-              </span>
-            )}
             <Link
-              href="/dashboard/docs"
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-accent text-accent-foreground h-9 px-4 py-2"
-            >
-              <Book className="mr-2 h-4 w-4" />
-              Docs
-            </Link>
-            <Link
-              href="/dashboard/profile"
+              href="/login"
               className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 text-muted-foreground hover:text-foreground"
             >
               <User className="mr-2 h-4 w-4" />
-              Profile
+              Sign In
             </Link>
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-destructive/10 hover:text-destructive h-9 px-4 py-2 text-muted-foreground"
+            <Link
+              href="/register"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2"
             >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </button>
+              Sign Up
+            </Link>
           </div>
         </div>
       </nav>
@@ -412,10 +373,10 @@ const resetPassword = async (token, new_password) => {
 
           <p className="text-lg text-muted-foreground leading-relaxed">
             Alternatively, if you are using JavaScript or TypeScript, you can install our official zero-dependency SDK:
-            <code className="bg-muted px-2 py-1 rounded ml-2 text-sm font-mono text-foreground">npm install @intellaxis/auth</code>
+            <code className="bg-muted px-2 py-1 rounded ml-2 text-sm font-mono text-foreground">npm install @capsulex/auth</code>
           </p>
           
-          <div className="bg-primary/10 border border-primary/20 rounded-xl p-6 mt-6">
+          <div className="bg-primary/10 border border-primary/20 rounded-md p-6 mt-6">
             <h3 className="text-lg font-semibold text-primary mb-2 flex items-center gap-2">
               <ShieldCheck className="h-5 w-5" />
               Security First: Authorized Domains
@@ -428,7 +389,7 @@ const resetPassword = async (token, new_password) => {
 
         {/* Code Tabs */}
         <section className="space-y-6">
-          <div className="flex items-center justify-between border-b border-border/40 pb-4">
+          <div className="flex items-center justify-between border-b border-border pb-4">
             <h2 className="text-2xl font-bold tracking-tight">Authentication Flow</h2>
             <div className="flex bg-muted p-1 rounded-lg">
               <button
@@ -447,13 +408,13 @@ const resetPassword = async (token, new_password) => {
                 onClick={() => setActiveTab('sdk')}
                 className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'sdk' ? 'bg-background shadow text-foreground text-primary' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                @intellaxis/auth SDK
+                @capsulex/auth SDK
               </button>
             </div>
           </div>
 
           {/* Register Block */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Code className="h-5 w-5 text-emerald-500" />
@@ -477,7 +438,7 @@ const resetPassword = async (token, new_password) => {
           </div>
 
           {/* Login Block */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Code className="h-5 w-5 text-blue-500" />
@@ -501,7 +462,7 @@ const resetPassword = async (token, new_password) => {
           </div>
 
           {/* Get Me Block */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Code className="h-5 w-5 text-purple-500" />
@@ -525,7 +486,7 @@ const resetPassword = async (token, new_password) => {
           </div>
 
           {/* Send Verification Email Block */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Code className="h-5 w-5 text-amber-500" />
@@ -549,7 +510,7 @@ const resetPassword = async (token, new_password) => {
           </div>
 
           {/* Verify Email Block */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Code className="h-5 w-5 text-amber-500" />
@@ -573,7 +534,7 @@ const resetPassword = async (token, new_password) => {
           </div>
 
           {/* Forgot Password Block */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Code className="h-5 w-5 text-rose-500" />
@@ -597,7 +558,7 @@ const resetPassword = async (token, new_password) => {
           </div>
 
           {/* Reset Password Block */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Code className="h-5 w-5 text-rose-500" />

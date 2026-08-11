@@ -81,7 +81,7 @@ export default function DeveloperLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-card border border-border rounded-2xl p-8 relative overflow-hidden">
+      <div className="w-full max-w-md bg-card border border-border rounded-md p-8 relative overflow-hidden">
         
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight mb-2 text-foreground">Sign in to {title}</h1>
@@ -89,7 +89,7 @@ export default function DeveloperLoginPage() {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">
+          <div className="mb-6 p-4 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">
             {error}
           </div>
         )}
@@ -106,7 +106,7 @@ export default function DeveloperLoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="flex h-12 w-full rounded-xl border border-input bg-background/50 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:bg-background transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-12 w-full rounded-md border border-input bg-background/50 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:bg-background transition-all disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
@@ -122,7 +122,7 @@ export default function DeveloperLoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="flex h-12 w-full rounded-xl border border-input bg-background/50 px-4 py-2 pr-10 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:bg-background transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-12 w-full rounded-md border border-input bg-background/50 px-4 py-2 pr-10 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:bg-background transition-all disabled:cursor-not-allowed disabled:opacity-50"
               />
               <button 
                 type="button"
@@ -137,7 +137,7 @@ export default function DeveloperLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex h-12 items-center justify-center rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:pointer-events-none disabled:opacity-50 shadow-sm"
+            className="w-full flex h-12 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:pointer-events-none disabled:opacity-50 shadow-sm"
           >
             {loading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -147,11 +147,19 @@ export default function DeveloperLoginPage() {
           </button>
         </form>
         
-        <div className="mt-6 text-center text-sm">
-          <span className="text-muted-foreground">Don't have an account? </span>
-          <Link href="/register" className="text-primary hover:underline font-medium">
-            Sign up
-          </Link>
+        <div className="mt-6 text-center text-sm flex flex-col space-y-3">
+          <div>
+            <span className="text-muted-foreground">Don't have an account? </span>
+            <Link href="/register" className="text-primary hover:underline font-medium">
+              Sign up
+            </Link>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Need help integrating? </span>
+            <Link href="/docs" className="text-primary hover:underline font-medium">
+              View Documentation
+            </Link>
+          </div>
         </div>
       </div>
     </div>

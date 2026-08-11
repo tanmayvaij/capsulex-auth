@@ -1,6 +1,6 @@
-# Intellaxis Auth
+# Capsulex Auth
 
-Intellaxis Auth is a robust, multi-tenant authentication provider designed to easily handle end-user authentication for multiple distinct applications. It serves as a central hub where developers can manage users, security, and authentication flows for all their projects.
+Capsulex Auth is a robust, multi-tenant authentication provider designed to easily handle end-user authentication for multiple distinct applications. It serves as a central hub where developers can manage users, security, and authentication flows for all their projects.
 
 ## 🚀 Features
 
@@ -23,7 +23,7 @@ Intellaxis Auth is a robust, multi-tenant authentication provider designed to ea
 
 ## 💻 Local Development Setup
 
-To run Intellaxis Auth locally, you'll need two terminal windows: one for the backend API and one for the frontend dashboard.
+To run Capsulex Auth locally, you'll need two terminal windows: one for the backend API and one for the frontend dashboard.
 
 ### Prerequisites
 - PostgreSQL running locally
@@ -31,7 +31,7 @@ To run Intellaxis Auth locally, you'll need two terminal windows: one for the ba
 - Node.js 18+
 
 ### 1. Database Setup
-Create a PostgreSQL database (e.g., named `intellaxis`). Ensure you update the `DATABASE_URL` in your backend `.env` file to point to this database.
+Create a PostgreSQL database (e.g., named `capsulex`). Ensure you update the `DATABASE_URL` in your backend `.env` file to point to this database.
 
 ### 2. Backend Setup
 Navigate to the `backend` directory and install the dependencies:
@@ -69,13 +69,13 @@ The frontend dashboard will run on `http://localhost:3000`.
 
 ## 📖 Integrating with Tenant Applications
 
-To use Intellaxis Auth in your own application:
+To use Capsulex Auth in your own application:
 
 1. Create a developer account at `http://localhost:3000/register`.
 2. Create a new Project in the dashboard.
 3. Configure your **Authorized Domains** (CORS Settings) in the project dashboard (e.g., add `http://localhost:5173` if you're building a Vite app locally).
 4. Copy your project's `API Key`.
-5. From your application, make requests to the Intellaxis Auth backend (e.g., `POST http://localhost:8000/api/auth/register`) and include your API Key in the headers:
+5. From your application, make requests to the Capsulex Auth backend (e.g., `POST http://localhost:8000/api/auth/register`) and include your API Key in the headers:
    ```http
    X-API-Key: proj_YOUR_API_KEY_HERE
    ```

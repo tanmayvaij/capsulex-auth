@@ -1,5 +1,5 @@
 export class Storage {
-  private static readonly TOKEN_KEY = 'intellaxis_auth_token';
+  private static readonly TOKEN_KEY = 'capsulex_auth_token';
   private memToken: string | null = null;
 
   constructor(private autoStoreToken: boolean = true) {}

@@ -335,6 +335,30 @@ async def update_developer_status(
     await db.refresh(dev)
     return {"id": dev.id, "email": dev.email, "is_active": dev.is_active, "created_at": dev.created_at}
 
+@admin_auth_router.delete("/developers/{developer_id}")
+async def delete_developer(
+    developer_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin)
+) -> Any:
+    from models.developer import Developer
+    from models.project import Project
+    result = await db.execute(select(Developer).where(Developer.id == developer_id))
+    dev = result.scalars().first()
+    if not dev:
+        raise HTTPException(status_code=404, detail="Developer not found")
+        
+    # Delete associated projects and their users
+    projects_result = await db.execute(select(Project).where(Project.developer_id == developer_id))
+    projects = projects_result.scalars().all()
+    for project in projects:
+        await db.execute(User.__table__.delete().where(User.project_id == project.id))
+        await db.delete(project)
+
+    await db.delete(dev)
+    await db.commit()
+    return {"message": "Developer deleted successfully"}
+
 @admin_auth_router.patch("/users/{user_id}/status", response_model=UserAdminResponse)
 async def update_user_status(
     user_id: str,

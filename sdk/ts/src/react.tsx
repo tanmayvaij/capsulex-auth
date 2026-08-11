@@ -1,24 +1,24 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { IntellaxisAuth, User, IntellaxisOptions } from './index';
+import { CapsulexAuth, User, CapsulexOptions } from './index';
 
-interface IntellaxisContextType {
+interface CapsulexContextType {
   user: User | null;
   isLoading: boolean;
-  login: typeof IntellaxisAuth.prototype.login;
-  register: typeof IntellaxisAuth.prototype.register;
+  login: typeof CapsulexAuth.prototype.login;
+  register: typeof CapsulexAuth.prototype.register;
   logout: () => void;
-  auth: IntellaxisAuth;
+  auth: CapsulexAuth;
 }
 
-const IntellaxisContext = createContext<IntellaxisContextType | undefined>(undefined);
+const CapsulexContext = createContext<CapsulexContextType | undefined>(undefined);
 
-export interface IntellaxisProviderProps extends IntellaxisOptions {
+export interface CapsulexProviderProps extends CapsulexOptions {
   apiKey: string;
   children: ReactNode;
 }
 
-export const IntellaxisProvider: React.FC<IntellaxisProviderProps> = ({ apiKey, children, ...options }) => {
-  const [auth] = useState(() => new IntellaxisAuth(apiKey, options));
+export const CapsulexProvider: React.FC<CapsulexProviderProps> = ({ apiKey, children, ...options }) => {
+  const [auth] = useState(() => new CapsulexAuth(apiKey, options));
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -61,7 +61,7 @@ export const IntellaxisProvider: React.FC<IntellaxisProviderProps> = ({ apiKey, 
     setUser(null);
   };
 
-  const value: IntellaxisContextType = {
+  const value: CapsulexContextType = {
     user,
     isLoading,
     login,
@@ -70,13 +70,13 @@ export const IntellaxisProvider: React.FC<IntellaxisProviderProps> = ({ apiKey, 
     auth,
   };
 
-  return <IntellaxisContext.Provider value={value}>{children}</IntellaxisContext.Provider>;
+  return <CapsulexContext.Provider value={value}>{children}</CapsulexContext.Provider>;
 };
 
-export const useIntellaxisAuth = (): IntellaxisContextType => {
-  const context = useContext(IntellaxisContext);
+export const useCapsulexAuth = (): CapsulexContextType => {
+  const context = useContext(CapsulexContext);
   if (context === undefined) {
-    throw new Error('useIntellaxisAuth must be used within an IntellaxisProvider');
+    throw new Error('useCapsulexAuth must be used within a CapsulexProvider');
   }
   return context;
 };

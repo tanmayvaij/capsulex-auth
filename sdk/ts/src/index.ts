@@ -1,19 +1,19 @@
-import { User, AuthResponse, IntellaxisOptions } from './types';
+import { User, AuthResponse, CapsulexOptions } from './types';
 import { Storage } from './storage';
 
 export * from './types';
 
-export class IntellaxisAuth {
+export class CapsulexAuth {
   private apiKey: string;
   private baseUrl: string;
   private storage: Storage;
 
-  constructor(apiKey: string, options: IntellaxisOptions = {}) {
+  constructor(apiKey: string, options: CapsulexOptions = {}) {
     if (!apiKey) {
-      throw new Error("IntellaxisAuth requires a valid API Key.");
+      throw new Error("CapsulexAuth requires a valid API Key.");
     }
     this.apiKey = apiKey;
-    this.baseUrl = options.baseUrl || 'https://api.intellaxis.com';
+    this.baseUrl = options.baseUrl || 'https://api.capsulex.com';
     this.storage = new Storage(options.autoStoreToken !== false);
   }
 

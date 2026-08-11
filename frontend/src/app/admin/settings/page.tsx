@@ -1,21 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, ShieldCheck, LogOut, CheckCircle2, AlertCircle, MonitorSmartphone, Mail, Circle } from "lucide-react";
-import Link from "next/link";
+import { Loader2, ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAppTitle } from "@/hooks/useAppTitle";
 
 export default function SettingsPage() {
-  const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const { title, updateTitle } = useAppTitle();
-  const [newTitle, setNewTitle] = useState("");
 
   useEffect(() => {
     if (successMsg || errorMsg) {
@@ -26,22 +21,6 @@ export default function SettingsPage() {
       return () => clearTimeout(timer);
     }
   }, [successMsg, errorMsg]);
-
-  const [activeTab, setActiveTab] = useState("security");
-
-  const handleTitleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newTitle.trim()) {
-      updateTitle(newTitle.trim());
-      setSuccessMsg("Application title updated successfully!");
-      setNewTitle("");
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("admin_token");
-    router.push("/login");
-  };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,157 +70,89 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background flex flex-col">
-      <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-16 items-center px-8 justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-primary/20 text-primary border border-primary/30">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
-              {title}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-muted-foreground hover:text-destructive transition-colors px-4 py-2 rounded-md hover:bg-destructive/10"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="text-sm font-medium">Sign Out</span>
-            </button>
-          </div>
-        </div>
-      </nav>
+    <div className="w-full space-y-8">
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight mb-2 text-foreground">Admin Settings</h2>
+        <p className="text-muted-foreground">Manage your master administrator account preferences.</p>
+      </div>
 
-      <main className="flex-1 p-8 w-full max-w-6xl mx-auto">
-        <div className="mb-8">
-          <Link 
-            href="/admin"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Link>
+      <div className="flex border-b border-border w-full gap-6">
+        <button 
+          className="pb-4 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors border-primary text-foreground"
+        >
+          <ShieldCheck className="h-4 w-4" />
+          Security Options
+        </button>
+      </div>
+
+      <div className="bg-card border border-border rounded-md p-8 shadow-sm">
+        {successMsg && (
+          <div className="mb-6 p-4 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+            <p className="text-sm text-emerald-500 font-medium">{successMsg}</p>
+          </div>
+        )}
+
+        {errorMsg && (
+          <div className="mb-6 p-4 rounded-md bg-destructive/10 border border-destructive/20 flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            <p className="text-sm text-destructive font-medium">{errorMsg}</p>
+          </div>
+        )}
+
+        <form onSubmit={handlePasswordReset} className="space-y-6 max-w-md animate-in fade-in duration-300">
+          <div>
+            <h3 className="text-xl font-semibold mb-1 text-foreground flex items-center gap-2">
+              Update Password
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">Ensure your account is using a long, random password.</p>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-foreground ml-1">Current Password</label>
+            <input 
+              type="password"
+              required
+              value={currentPassword}
+              onChange={e => setCurrentPassword(e.target.value)}
+              className="flex h-12 w-full rounded-md border border-input/50 bg-background/50 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
           
-          <h2 className="text-3xl font-bold tracking-tight mb-2">Admin Settings</h2>
-          <p className="text-muted-foreground mb-8">Manage your master administrator account preferences.</p>
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-foreground ml-1">New Password</label>
+            <input 
+              type="password"
+              required
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="flex h-12 w-full rounded-md border border-input/50 bg-background/50 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
 
-          <div className="flex border-b border-border/40 mb-6 gap-6 w-full">
-            <button 
-              onClick={() => { setActiveTab('security'); setSuccessMsg(''); setErrorMsg(''); }} 
-              className={`pb-3 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'security' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-foreground ml-1">Confirm New Password</label>
+            <input 
+              type="password"
+              required
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              className="flex h-12 w-full rounded-md border border-input/50 bg-background/50 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center rounded-md text-sm font-semibold transition-all disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] h-12 px-6 shadow-sm"
             >
-              <ShieldCheck className="h-4 w-4" />
-              Security
-            </button>
-            <button 
-              onClick={() => { setActiveTab('appearance'); setSuccessMsg(''); setErrorMsg(''); }} 
-              className={`pb-3 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'appearance' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-            >
-              <MonitorSmartphone className="h-4 w-4" />
-              Appearance
+              {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Save Password"}
             </button>
           </div>
-        </div>
+        </form>
 
-        <div className="bg-background/50 border border-border rounded-lg p-8 w-full shadow-sm">
-          {successMsg && (
-            <div className="mb-6 p-4 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-emerald-500 font-medium">{successMsg}</p>
-            </div>
-          )}
-
-          {errorMsg && (
-            <div className="mb-6 p-4 rounded-md bg-destructive/10 border border-destructive/20 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive font-medium">{errorMsg}</p>
-            </div>
-          )}
-
-          {activeTab === 'security' && (
-            <form onSubmit={handlePasswordReset} className="space-y-4">
-              <h3 className="text-xl font-semibold mb-6 text-foreground flex items-center gap-2">
-                Update Password
-              </h3>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Current Password</label>
-                <input 
-                  type="password"
-                  required
-                  value={currentPassword}
-                  onChange={e => setCurrentPassword(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">New Password</label>
-                <input 
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Confirm New Password</label>
-                <input 
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                />
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                >
-                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Update Password
-                </button>
-              </div>
-            </form>
-          )}
-
-          {activeTab === 'appearance' && (
-            <form onSubmit={handleTitleSubmit} className="space-y-4">
-              <h3 className="text-xl font-semibold mb-6 text-foreground flex items-center gap-2">
-                Application Title
-              </h3>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Custom Application Title</label>
-                <div className="flex gap-4">
-                  <input 
-                    type="text"
-                    required
-                    placeholder={title}
-                    value={newTitle}
-                    onChange={e => setNewTitle(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                  />
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 shrink-0"
-                  >
-                    Save Title
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground">This updates the title shown in the navigation bar and the browser tab.</p>
-              </div>
-            </form>
-          )}
-
-
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -13,10 +13,10 @@ export interface AuthResponse {
   token_type: string;
 }
 
-export interface IntellaxisOptions {
+export interface CapsulexOptions {
   /**
-   * The base URL of your Intellaxis Auth instance.
-   * Defaults to 'https://api.intellaxis.com' if not provided.
+   * The base URL of your Capsulex Auth instance.
+   * Defaults to 'https://api.capsulex.com' if not provided.
    */
   baseUrl?: string;
   

@@ -56,7 +56,7 @@ export default function AdminProjectUsersPage({ params }: { params: Promise<{ id
 
   return (
     <div className="min-h-screen w-full bg-background flex flex-col">
-      <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="sticky top-0 z-50 w-full border-b border-border bg-background">
         <div className="flex h-16 items-center px-8 justify-between">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-primary bg-primary/10">
@@ -103,10 +103,10 @@ export default function AdminProjectUsersPage({ params }: { params: Promise<{ id
           </p>
         </div>
 
-        <div className="rounded-xl border border-border/40 overflow-hidden bg-card shadow-sm">
+        <div className="rounded-md border border-border overflow-hidden bg-card shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs uppercase bg-muted/30 text-muted-foreground">
+              <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
                 <tr>
                   <th scope="col" className="px-6 py-4 font-medium">User ID</th>
                   <th scope="col" className="px-6 py-4 font-medium">Email</th>
@@ -115,7 +115,7 @@ export default function AdminProjectUsersPage({ params }: { params: Promise<{ id
                   <th scope="col" className="px-6 py-4 font-medium">Created At</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/40">
+              <tbody className="divide-y divide-border">
                 {users.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground italic">
@@ -124,7 +124,7 @@ export default function AdminProjectUsersPage({ params }: { params: Promise<{ id
                   </tr>
                 ) : (
                   users.map((user) => (
-                    <tr key={user.id} className="hover:bg-muted/10 transition-colors">
+                    <tr key={user.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
                         {user.id}
                       </td>
