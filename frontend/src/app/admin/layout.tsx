@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Loader2, LayoutDashboard, Settings, LogOut, ShieldCheck, Users, FolderOpen, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useAppTitle } from "@/hooks/useAppTitle";
+import { apiFetch } from "@/lib/api";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -15,18 +16,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { title } = useAppTitle();
 
   useEffect(() => {
-    // Quick token check for layout rendering
-    const token = localStorage.getItem("admin_token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    setLoading(false);
+    const checkAuth = async () => {
+      try {
+        const res = await apiFetch("/api/admin/auth/stats", { role: "admin" });
+        if (!res.ok) {
+          throw new Error("Unauthorized");
+        }
+      } catch (e) {
+        router.push("/login");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuth();
   }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("admin_token");
-    localStorage.removeItem("admin_refresh_token");
+  const handleLogout = async () => {
+    try {
+      await apiFetch("/api/admin/auth/logout", { method: "POST", requireAuth: false, role: "admin" });
+    } catch (e) {
+      console.error("Logout error", e);
+    }
     router.push("/login");
   };
 
@@ -83,9 +94,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="h-20 flex items-center px-4">
           <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
-            <div className="w-10 h-10 rounded-md flex items-center justify-center text-primary bg-primary/10 shrink-0 mx-auto">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
             {!isCollapsed && (
               <div>
                 <h1 className="font-bold tracking-tight text-foreground flex items-center gap-2">
@@ -146,9 +154,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-primary bg-primary/10">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
             <h1 className="font-bold tracking-tight text-foreground flex items-center gap-2">
                 {title} 
                 <span className="text-[10px] uppercase font-bold tracking-wider bg-primary/20 text-primary px-1.5 py-0.5 rounded-md">Admin</span>

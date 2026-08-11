@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_
@@ -252,6 +252,7 @@ async def setup_admin(
 @limiter.limit("5/minute")
 async def admin_login(
     request: Request,
+    response: Response,
     admin_in: AdminLogin, 
     db: AsyncSession = Depends(get_db),
 ) -> Any:
@@ -266,17 +267,25 @@ async def admin_login(
     
     access_token = create_access_token(subject=admin.id, extra_claims={"role": "admin"})
     refresh_token = create_refresh_token(subject=admin.id, extra_claims={"role": "admin"})
+    
+    response.set_cookie(key="admin_token", value=access_token, httponly=True, samesite="lax")
+    response.set_cookie(key="admin_refresh_token", value=refresh_token, httponly=True, samesite="lax")
+    
     return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token}
 
 @admin_auth_router.post("/refresh", response_model=Token)
 @limiter.limit("5/minute")
 async def refresh_admin_token(
     request: Request,
-    refresh_req: RefreshRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
+    refresh_token_cookie = request.cookies.get("admin_refresh_token")
+    if not refresh_token_cookie:
+        raise HTTPException(status_code=401, detail="Missing refresh token")
+        
     try:
-        payload = jwt.decode(refresh_req.refresh_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(refresh_token_cookie, settings.SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
             
@@ -286,9 +295,16 @@ async def refresh_admin_token(
             raise HTTPException(status_code=401, detail="Invalid token payload")
             
         access_token = create_access_token(subject=subject, extra_claims={"role": "admin"})
+        response.set_cookie(key="admin_token", value=access_token, httponly=True, samesite="lax")
         return {"access_token": access_token, "token_type": "bearer"}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+@admin_auth_router.post("/logout")
+async def admin_logout(response: Response):
+    response.delete_cookie("admin_token")
+    response.delete_cookie("admin_refresh_token")
+    return {"message": "Logged out successfully"}
 
 @admin_auth_router.get("/stats")
 async def get_admin_stats(

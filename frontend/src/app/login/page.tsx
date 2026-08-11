@@ -44,6 +44,7 @@ export default function DeveloperLoginPage() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/login`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -58,12 +59,8 @@ export default function DeveloperLoginPage() {
       const data = await res.json();
       
       if (data.role === "admin") {
-          localStorage.setItem("admin_token", data.access_token);
-          localStorage.setItem("admin_refresh_token", data.refresh_token);
           router.push("/admin");
       } else {
-          localStorage.setItem("developer_token", data.access_token);
-          localStorage.setItem("developer_refresh_token", data.refresh_token);
           router.push("/dashboard");
       }
     } catch (err: any) {

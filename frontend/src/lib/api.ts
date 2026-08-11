@@ -9,52 +9,41 @@ export async function apiFetch(endpoint: string, options: ApiFetchOptions = {}):
   const { requireAuth = true, role = "developer", ...fetchOptions } = options;
   
   const headers = new Headers(fetchOptions.headers);
-  const tokenKey = role === "admin" ? "admin_token" : "developer_token";
-  const refreshKey = role === "admin" ? "admin_refresh_token" : "developer_refresh_token";
-  const refreshEndpoint = role === "admin" ? "/api/admin/auth/refresh" : "/api/developer/auth/refresh";
-
-  if (requireAuth) {
-    const token = localStorage.getItem(tokenKey);
-    if (token) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-  }
+  
+  // Tokens are now stored in httpOnly cookies, so we don't need to manually append them.
+  // We just ensure credentials (cookies) are sent with every request.
+  const fetchOptionsWithCreds: RequestInit = {
+    ...fetchOptions,
+    credentials: "include", // Send cookies with requests
+    headers,
+  };
 
   const url = endpoint.startsWith("http") ? endpoint : `${API_URL}${endpoint}`;
 
-  let response = await fetch(url, {
-    ...fetchOptions,
-    headers,
-  });
+  let response = await fetch(url, fetchOptionsWithCreds);
 
   if (response.status === 401 && requireAuth) {
-    const refreshToken = localStorage.getItem(refreshKey);
-    if (refreshToken) {
-      const refreshResponse = await fetch(`${API_URL}${refreshEndpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
+    // With httpOnly cookies, we just call the refresh endpoint.
+    // The backend will automatically read the refresh cookie and set a new access cookie.
+    const refreshEndpoint = role === "admin" ? "/api/admin/auth/refresh" : "/api/developer/auth/refresh";
+    
+    const refreshResponse = await fetch(`${API_URL}${refreshEndpoint}`, {
+      method: "POST",
+      credentials: "include", // Important: send the refresh cookie
+      headers: {
+        "Content-Type": "application/json",
+      },
+      // Note: No body needed, backend reads from cookie
+    });
 
-      if (refreshResponse.ok) {
-        const data = await refreshResponse.json();
-        localStorage.setItem(tokenKey, data.access_token);
-        
-        // Retry original request
-        headers.set("Authorization", `Bearer ${data.access_token}`);
-        response = await fetch(url, {
-          ...fetchOptions,
-          headers,
-        });
-      } else {
-        // Refresh failed, clear tokens
-        localStorage.removeItem(tokenKey);
-        localStorage.removeItem(refreshKey);
-      }
+    if (refreshResponse.ok) {
+      // Retry original request
+      response = await fetch(url, fetchOptionsWithCreds);
     } else {
-        localStorage.removeItem(tokenKey);
+      // Refresh failed. The backend likely cleared the cookies, or we should redirect to login.
+      if (typeof window !== 'undefined') {
+        window.location.href = "/login";
+      }
     }
   }
 

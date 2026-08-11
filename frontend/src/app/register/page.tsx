@@ -29,6 +29,7 @@ export default function DeveloperRegisterPage() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/register`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -43,6 +44,7 @@ export default function DeveloperRegisterPage() {
       // After successful registration, log them in automatically
       const loginRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/login`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -54,8 +56,6 @@ export default function DeveloperRegisterPage() {
       }
       
       const loginData = await loginRes.json();
-      localStorage.setItem("developer_token", loginData.access_token);
-      localStorage.setItem("developer_refresh_token", loginData.refresh_token);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message);

@@ -10,7 +10,7 @@ from models.user import User
 from models.project import Project
 from models.admin import Admin
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 async def get_project_from_api_key(
     request: Request,
@@ -46,14 +46,20 @@ async def get_project_from_api_key(
             
     return project
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+async def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # Try getting token from cookie first, fallback to header
+    actual_token = request.cookies.get("access_token") or token
+    if not actual_token:
+        raise credentials_exception
+
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(actual_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
             raise credentials_exception
@@ -66,14 +72,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     
     if user is None:
         raise credentials_exception
-async def get_current_admin(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> Admin:
+async def get_current_admin(request: Request, token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> Admin:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate admin credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    actual_token = request.cookies.get("admin_token") or token
+    if not actual_token:
+        raise credentials_exception
+
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(actual_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         admin_id_str: str = payload.get("sub")
         role: str = payload.get("role")
         if admin_id_str is None or role != "admin":
@@ -89,15 +100,20 @@ async def get_current_admin(token: str = Depends(oauth2_scheme), db: AsyncSessio
         raise credentials_exception
     return admin
 
-async def get_current_developer(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+async def get_current_developer(request: Request, token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     from models.developer import Developer
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate developer credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    actual_token = request.cookies.get("developer_token") or token
+    if not actual_token:
+        raise credentials_exception
+
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(actual_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         dev_id_str: str = payload.get("sub")
         role: str = payload.get("role")
         if dev_id_str is None or role != "developer":

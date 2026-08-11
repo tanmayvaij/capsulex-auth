@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
@@ -47,6 +47,7 @@ async def register_developer(
 @limiter.limit("5/minute")
 async def login_developer_or_admin(
     request: Request,
+    response: Response,
     dev_in: DeveloperLogin, 
     db: AsyncSession = Depends(get_db)
 ) -> Any:
@@ -62,6 +63,10 @@ async def login_developer_or_admin(
             extra_claims={"role": "admin"}
         )
         refresh_token = create_refresh_token(subject=admin.id, extra_claims={"role": "admin"})
+        
+        response.set_cookie(key="admin_token", value=access_token, httponly=True, samesite="lax")
+        response.set_cookie(key="admin_refresh_token", value=refresh_token, httponly=True, samesite="lax")
+        
         return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token, "role": "admin"}
         
     # Check Developer
@@ -85,17 +90,27 @@ async def login_developer_or_admin(
         extra_claims={"role": "developer"}
     )
     refresh_token = create_refresh_token(subject=dev.id, extra_claims={"role": "developer"})
+    
+    response.set_cookie(key="developer_token", value=access_token, httponly=True, samesite="lax")
+    response.set_cookie(key="developer_refresh_token", value=refresh_token, httponly=True, samesite="lax")
+    
     return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token, "role": "developer"}
 
 @developer_router.post("/auth/refresh", response_model=Token)
 @limiter.limit("5/minute")
 async def refresh_developer_token(
     request: Request,
-    refresh_req: RefreshRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
+    # Handle both developer and admin refreshes on this endpoint since login also unifies them,
+    # or rely on frontend to call the right one.
+    refresh_token_cookie = request.cookies.get("developer_refresh_token") or request.cookies.get("admin_refresh_token")
+    if not refresh_token_cookie:
+        raise HTTPException(status_code=401, detail="Missing refresh token")
+        
     try:
-        payload = jwt.decode(refresh_req.refresh_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(refresh_token_cookie, settings.SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
             
@@ -108,9 +123,21 @@ async def refresh_developer_token(
             subject=subject, 
             extra_claims={"role": role}
         )
+        
+        token_key = "admin_token" if role == "admin" else "developer_token"
+        response.set_cookie(key=token_key, value=access_token, httponly=True, samesite="lax")
+        
         return {"access_token": access_token, "token_type": "bearer"}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+@developer_router.post("/auth/logout")
+async def developer_logout(response: Response):
+    response.delete_cookie("developer_token")
+    response.delete_cookie("developer_refresh_token")
+    response.delete_cookie("admin_token")
+    response.delete_cookie("admin_refresh_token")
+    return {"message": "Logged out successfully"}
 
 @developer_router.get("/auth/me", response_model=DeveloperResponse)
 async def get_me(current_dev: Developer = Depends(get_current_developer)) -> Any:

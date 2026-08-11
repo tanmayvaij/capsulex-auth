@@ -73,6 +73,7 @@ export default function AdminSetupPage() {
       // 2. Automatically log them in
       const loginRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/auth/login`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -80,9 +81,6 @@ export default function AdminSetupPage() {
       });
       
       if (loginRes.ok) {
-        const data = await loginRes.json();
-        localStorage.setItem("admin_token", data.access_token);
-        localStorage.setItem("admin_refresh_token", data.refresh_token);
         setSuccess(true);
         setTimeout(() => {
           router.push("/admin");
@@ -129,11 +127,7 @@ export default function AdminSetupPage() {
 
       <div className="w-full max-w-md bg-card border border-border shadow-2xl rounded-md p-8 relative overflow-hidden z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
         
-        <div className="flex justify-center mb-6">
-          <div className="w-12 h-12 rounded-md flex items-center justify-center text-primary bg-primary/10 border border-primary/20">
-            <ShieldCheck className="h-6 w-6" />
-          </div>
-        </div>
+
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight mb-2 text-foreground">Welcome to {title}</h1>

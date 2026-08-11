@@ -27,7 +27,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const data = await res.json();
         setDeveloper(data);
       } catch (e) {
-        localStorage.removeItem("developer_token");
         router.push("/login");
       } finally {
         setLoading(false);
@@ -37,9 +36,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     fetchDev();
   }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("developer_token");
-    localStorage.removeItem("developer_refresh_token");
+  const handleLogout = async () => {
+    try {
+      await apiFetch("/api/developer/auth/logout", { method: "POST", requireAuth: false });
+    } catch (e) {
+      console.error("Logout error", e);
+    }
     router.push("/login");
   };
 
@@ -72,9 +74,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="h-20 flex items-center px-4">
           <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
-            <div className="w-10 h-10 rounded-md flex items-center justify-center text-primary bg-primary/10 shrink-0 mx-auto">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
             {!isCollapsed && (
               <div>
                 <h1 className="font-bold tracking-tight text-foreground">{title}</h1>
@@ -137,9 +136,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile Nav Header */}
         <header className="h-16 border-b border-border/50 bg-card md:hidden flex items-center justify-between px-4">
            <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-primary bg-primary/10">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
             <h1 className="font-bold tracking-tight text-foreground">{title}</h1>
           </div>
           <button onClick={handleLogout} className="p-2 text-muted-foreground hover:text-destructive">
