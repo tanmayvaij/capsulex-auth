@@ -11,7 +11,7 @@ class Project(Base):
     name = Column(String, index=True, nullable=False)
     api_key = Column(String, unique=True, index=True, nullable=False)
     allowed_origins = Column(JSON, default=list)
-    mail_provider = Column(String, nullable=False, default="console")
+    mail_provider = Column(String, nullable=False, default="zeptomail")
     zeptomail_api_key = Column(String, nullable=True)
     zeptomail_from_address = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

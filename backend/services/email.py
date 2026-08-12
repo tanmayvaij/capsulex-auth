@@ -8,18 +8,7 @@ class BaseEmailService:
     async def send_password_reset_email(self, to_email: str, token: str):
         raise NotImplementedError
 
-class ConsoleEmailService(BaseEmailService):
-    async def send_verification_email(self, to_email: str, token: str):
-        print("="*50)
-        print(f"📧 EMAIL VERIFICATION TO: {to_email}")
-        print(f"🔑 TOKEN: {token}")
-        print("="*50)
-        
-    async def send_password_reset_email(self, to_email: str, token: str):
-        print("="*50)
-        print(f"📧 PASSWORD RESET TO: {to_email}")
-        print(f"🔑 TOKEN: {token}")
-        print("="*50)
+
 
 class ZeptoMailService(BaseEmailService):
     def __init__(self, api_key: str, from_address: str):
@@ -67,11 +56,8 @@ from models.project import Project
 from api.deps import get_project_from_api_key
 
 async def get_email_service(project: Project = Depends(get_project_from_api_key)) -> BaseEmailService:
-    if project.mail_provider == "zeptomail":
-        if project.zeptomail_api_key and project.zeptomail_from_address:
-            return ZeptoMailService(project.zeptomail_api_key, project.zeptomail_from_address)
-        else:
-            print(f"⚠️ ZeptoMail selected as active provider for project {project.id} but API keys are missing! Falling back to console.")
-        
-    # Fallback to local console print if not configured or explicitly set to console
-    return ConsoleEmailService()
+    if project.zeptomail_api_key and project.zeptomail_from_address:
+        return ZeptoMailService(project.zeptomail_api_key, project.zeptomail_from_address)
+    else:
+        print(f"⚠️ ZeptoMail is missing API keys for project {project.id}. Emails will be skipped.")
+        return ZeptoMailService("", "")

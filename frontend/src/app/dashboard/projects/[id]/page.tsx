@@ -21,7 +21,7 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
 
   // Mail Config State
   const [mailConfig, setMailConfig] = useState({
-    provider: 'console',
+    provider: 'zeptomail',
     apiKey: '',
     fromAddress: ''
   });
@@ -58,7 +58,7 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
         setProject(projectData);
         setUsers(usersData);
         setMailConfig({
-            provider: projectData.mail_provider || 'console',
+            provider: 'zeptomail',
             apiKey: projectData.zeptomail_api_key || '',
             fromAddress: projectData.zeptomail_from_address || ''
         });
@@ -82,7 +82,7 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                mail_provider: mailConfig.provider,
+                mail_provider: 'zeptomail',
                 zeptomail_api_key: mailConfig.apiKey || null,
                 zeptomail_from_address: mailConfig.fromAddress || null
             })
@@ -284,91 +284,38 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
           <p className="text-sm text-muted-foreground mb-8">Configure how this project sends emails to its users.</p>
           
           <div className="space-y-8 max-w-2xl">
-            <div className="space-y-4">
-              <label className="text-sm font-semibold text-foreground ml-1">Active Provider</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div 
-                  className={`flex items-start p-5 border-2 rounded-md cursor-pointer transition-all ${
-                    mailConfig.provider === 'console' 
-                      ? 'border-emerald-500/50 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
-                      : 'border-border bg-background/30 hover:border-border hover:bg-background/50'
-                  }`}
-                  onClick={() => setMailConfig({...mailConfig, provider: 'console'})}
-                >
-                  <div className="flex items-center h-6 mt-0.5">
-                    {mailConfig.provider === 'console' ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    ) : (
-                      <Circle className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="ml-4">
-                    <span className="block text-sm font-bold text-foreground">Console (Local Dev)</span>
-                    <span className="block text-xs text-muted-foreground mt-1">
-                      Emails will be printed to the backend terminal instead of being sent.
-                    </span>
-                  </div>
+            <div className="space-y-6 max-w-2xl">
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-foreground ml-1">ZeptoMail API Key</label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? "text" : "password"}
+                    value={mailConfig.apiKey}
+                    onChange={(e) => setMailConfig({...mailConfig, apiKey: e.target.value})}
+                    placeholder="Zoho-enczapikey wSsVR60j/0...."
+                    className="flex h-12 w-full rounded-md border border-input/50 bg-background/50 px-4 py-2 pr-12 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors"
+                  >
+                    {showApiKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
                 </div>
-                
-                <div 
-                  className={`flex items-start p-5 border-2 rounded-md cursor-pointer transition-all ${
-                    mailConfig.provider === 'zeptomail' 
-                      ? 'border-emerald-500/50 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
-                      : 'border-border bg-background/30 hover:border-border hover:bg-background/50'
-                  }`}
-                  onClick={() => setMailConfig({...mailConfig, provider: 'zeptomail'})}
-                >
-                  <div className="flex items-center h-6 mt-0.5">
-                    {mailConfig.provider === 'zeptomail' ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    ) : (
-                      <Circle className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="ml-4">
-                    <span className="block text-sm font-bold text-foreground">ZeptoMail</span>
-                    <span className="block text-xs text-muted-foreground mt-1">
-                      Send real emails using the Zoho ZeptoMail API.
-                    </span>
-                  </div>
-                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-foreground ml-1">From Address</label>
+                <input
+                  type="email"
+                  value={mailConfig.fromAddress}
+                  onChange={(e) => setMailConfig({...mailConfig, fromAddress: e.target.value})}
+                  placeholder="noreply@yourdomain.com"
+                  className="flex h-12 w-full rounded-md border border-input/50 bg-background/50 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all"
+                />
               </div>
             </div>
-
-            {mailConfig.provider === 'zeptomail' && (
-              <div className="pt-6 border-t border-border space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="space-y-3">
-                  <label className="text-sm font-semibold text-foreground ml-1">ZeptoMail API Key</label>
-                  <div className="relative">
-                    <input
-                      type={showApiKey ? "text" : "password"}
-                      value={mailConfig.apiKey}
-                      onChange={(e) => setMailConfig({...mailConfig, apiKey: e.target.value})}
-                      placeholder="Zoho-enczapikey wSsVR60j/0...."
-                      className="flex h-12 w-full rounded-md border border-input/50 bg-background/50 px-4 py-2 pr-12 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all"
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors"
-                    >
-                      {showApiKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-sm font-semibold text-foreground ml-1">From Address</label>
-                  <input
-                    type="email"
-                    value={mailConfig.fromAddress}
-                    onChange={(e) => setMailConfig({...mailConfig, fromAddress: e.target.value})}
-                    placeholder="noreply@yourdomain.com"
-                    className="flex h-12 w-full rounded-md border border-input/50 bg-background/50 px-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all"
-                  />
-                </div>
-              </div>
-            )}
 
             <div className="pt-6 flex items-center gap-4">
               <button
