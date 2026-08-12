@@ -10,6 +10,13 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class OTPRequest(BaseModel):
+    email: EmailStr
+
+class OTPVerifyRequest(BaseModel):
+    email: EmailStr
+    otp_code: str
+
 class UserResponse(BaseModel):
     id: str
     email: EmailStr

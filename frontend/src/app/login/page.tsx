@@ -84,7 +84,6 @@ export default function DeveloperLoginPage() {
         
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight mb-2 text-foreground">Sign in to {title}</h1>
-          <p className="text-sm text-muted-foreground">Developer Portal</p>
         </div>
 
         {error && (

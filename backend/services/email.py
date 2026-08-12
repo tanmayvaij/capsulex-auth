@@ -8,6 +8,9 @@ class BaseEmailService:
     async def send_password_reset_email(self, to_email: str, token: str):
         raise NotImplementedError
 
+    async def send_otp_email(self, to_email: str, otp: str):
+        raise NotImplementedError
+
 
 
 class ZeptoMailService(BaseEmailService):
@@ -51,11 +54,28 @@ class ZeptoMailService(BaseEmailService):
         htmlbody = f"<div><b>Your password reset token is: {token}</b></div>"
         await self._send_email(to_email, "Reset Your Password", htmlbody)
 
+    async def send_otp_email(self, to_email: str, otp: str):
+        htmlbody = f"""
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #333;">Your Authentication Code</h2>
+            <p>Please use the following 6-digit code to log in to your account. This code will expire in 10 minutes.</p>
+            <div style="background-color: #f4f4f5; padding: 16px; border-radius: 8px; text-align: center; margin: 24px 0;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #111;">{otp}</span>
+            </div>
+            <p style="color: #666; font-size: 14px;">If you did not request this code, you can safely ignore this email.</p>
+        </div>
+        """
+        await self._send_email(to_email, "Your Login Code", htmlbody)
+
 from fastapi import Depends
 from models.project import Project
 from api.deps import get_project_from_api_key
 
 async def get_email_service(project: Project = Depends(get_project_from_api_key)) -> BaseEmailService:
+    if project.mail_provider == "none":
+        print(f"⚠️ Mail provider is set to 'none' for project {project.id}. Emails will be skipped.")
+        return ZeptoMailService("", "")
+        
     if project.zeptomail_api_key and project.zeptomail_from_address:
         return ZeptoMailService(project.zeptomail_api_key, project.zeptomail_from_address)
     else:

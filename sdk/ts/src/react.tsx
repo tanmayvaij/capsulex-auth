@@ -6,6 +6,8 @@ interface CapsulexContextType {
   isLoading: boolean;
   login: typeof CapsulexAuth.prototype.login;
   register: typeof CapsulexAuth.prototype.register;
+  requestOtp: typeof CapsulexAuth.prototype.requestOtp;
+  verifyOtp: typeof CapsulexAuth.prototype.verifyOtp;
   logout: () => void;
   auth: CapsulexAuth;
 }
@@ -22,51 +24,31 @@ export const CapsulexProvider: React.FC<CapsulexProviderProps> = ({ apiKey, chil
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchUser = async () => {
-    setIsLoading(true);
-    try {
-      const token = auth.getToken();
-      if (token) {
-        const userData = await auth.getMe();
-        setUser(userData);
-      } else {
-        setUser(null);
-      }
-    } catch (error) {
-      // Token invalid or expired
-      setUser(null);
-      auth.logout();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Initial fetch to populate state if token exists
+    setIsLoading(true);
+    auth.getMe().catch(() => {
+      if (auth.getToken()) auth.logout();
+    }).finally(() => {
+      setIsLoading(false);
+    });
+
+    // Subscribe to auth state changes
+    const unsubscribe = auth.onAuthStateChange((newUser) => {
+      setUser(newUser);
+    });
+
+    return () => unsubscribe();
   }, [auth]);
-
-  const login: typeof auth.login = async (email, password) => {
-    const res = await auth.login(email, password);
-    await fetchUser();
-    return res;
-  };
-
-  const register: typeof auth.register = async (email, password) => {
-    return auth.register(email, password);
-  };
-
-  const logout = () => {
-    auth.logout();
-    setUser(null);
-  };
 
   const value: CapsulexContextType = {
     user,
     isLoading,
-    login,
-    register,
-    logout,
+    login: auth.login.bind(auth),
+    register: auth.register.bind(auth),
+    requestOtp: auth.requestOtp.bind(auth),
+    verifyOtp: auth.verifyOtp.bind(auth),
+    logout: auth.logout.bind(auth),
     auth,
   };
 

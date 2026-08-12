@@ -7,6 +7,8 @@ export class CapsulexAuth {
   private apiKey: string;
   private baseUrl: string;
   private storage: Storage;
+  private currentUser: User | null = null;
+  private listeners: Array<(user: User | null) => void> = [];
 
   constructor(apiKey: string, options: CapsulexOptions = {}) {
     if (!apiKey) {
@@ -56,6 +58,24 @@ export class CapsulexAuth {
   }
 
   /**
+   * Register a listener for authentication state changes (similar to Firebase's onAuthStateChanged)
+   * Returns an unsubscribe function.
+   */
+  onAuthStateChange(callback: (user: User | null) => void): () => void {
+    this.listeners.push(callback);
+    callback(this.currentUser); // Fire immediately with current state
+    
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== callback);
+    };
+  }
+
+  private notifyListeners(user: User | null) {
+    this.currentUser = user;
+    this.listeners.forEach(listener => listener(user));
+  }
+
+  /**
    * Login an existing user
    */
   async login(email: string, password: string): Promise<AuthResponse> {
@@ -66,6 +86,35 @@ export class CapsulexAuth {
     
     if (response.access_token) {
       this.storage.setToken(response.access_token);
+      // Automatically fetch the user to update listeners
+      await this.getMe().catch(() => null);
+    }
+    
+    return response;
+  }
+
+  /**
+   * Request a 6-digit OTP code sent via email for passwordless authentication
+   */
+  async requestOtp(email: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/auth/otp/request', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  }
+
+  /**
+   * Verify an OTP code and log the user in
+   */
+  async verifyOtp(email: string, otp_code: string): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>('/api/auth/otp/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp_code })
+    });
+    
+    if (response.access_token) {
+      this.storage.setToken(response.access_token);
+      await this.getMe().catch(() => null);
     }
     
     return response;
@@ -76,6 +125,7 @@ export class CapsulexAuth {
    */
   logout(): void {
     this.storage.clearToken();
+    this.notifyListeners(null);
   }
 
   /**
@@ -88,10 +138,13 @@ export class CapsulexAuth {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    return this.request<User>('/api/auth/me', {
+    const user = await this.request<User>('/api/auth/me', {
       method: 'GET',
       headers
     });
+    
+    this.notifyListeners(user);
+    return user;
   }
 
   /**

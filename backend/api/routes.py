@@ -1,4 +1,5 @@
 import secrets
+import string
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -10,7 +11,7 @@ from db.session import get_db
 from schemas.user import (
     UserCreate, UserLogin, UserResponse, Token, UserAdminResponse, 
     UserStatusUpdate, VerifyEmailRequest, ForgotPasswordRequest, ResetPasswordRequest,
-    SendVerificationEmailRequest, RefreshRequest
+    SendVerificationEmailRequest, RefreshRequest, OTPRequest, OTPVerifyRequest
 )
 from schemas.project import ProjectCreate, ProjectResponse, AdminProjectResponse
 from models.user import User
@@ -211,6 +212,94 @@ async def reset_password(
     await db.commit()
     
     return {"message": "Password has been reset successfully"}
+
+@auth_router.post("/otp/request")
+@limiter.limit("5/minute")
+async def request_otp(
+    request: Request,
+    req: OTPRequest,
+    db: AsyncSession = Depends(get_db),
+    project: Project = Depends(get_project_from_api_key),
+    email_service: BaseEmailService = Depends(get_email_service)
+) -> Any:
+    # Look up user
+    result = await db.execute(select(User).where(and_(User.email == req.email, User.project_id == project.id)))
+    user = result.scalars().first()
+    
+    if not user:
+        # Create user without password
+        user = User(
+            email=req.email,
+            project_id=project.id,
+            hashed_password=None,
+            is_email_verified=False
+        )
+        db.add(user)
+    
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Account is disabled")
+
+    # Generate 6-digit numeric OTP
+    otp_code = ''.join(secrets.choice(string.digits) for _ in range(6))
+    user.otp_code = otp_code
+    user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    
+    await db.commit()
+    await email_service.send_otp_email(user.email, otp_code)
+    
+    return {"message": "If that email is registered, an OTP has been sent."}
+
+@auth_router.post("/otp/verify")
+@limiter.limit("10/minute")
+async def verify_otp(
+    request: Request,
+    response: Response,
+    req: OTPVerifyRequest,
+    db: AsyncSession = Depends(get_db),
+    project: Project = Depends(get_project_from_api_key)
+) -> Any:
+    result = await db.execute(select(User).where(and_(User.email == req.email, User.project_id == project.id)))
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or OTP")
+        
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Account is disabled")
+        
+    if not user.otp_code or user.otp_code != req.otp_code:
+        raise HTTPException(status_code=401, detail="Invalid email or OTP")
+        
+    if user.otp_expires_at is None or user.otp_expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="OTP has expired")
+        
+    # Valid OTP
+    user.otp_code = None
+    user.otp_expires_at = None
+    user.is_email_verified = True
+    user.last_signed_in = datetime.now(timezone.utc)
+    
+    await db.commit()
+    
+    # Generate tokens
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.id, "role": "user", "project_id": project.id},
+        expires_delta=access_token_expires
+    )
+    
+    refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    refresh_token = create_refresh_token(
+        data={"sub": user.id, "role": "user", "project_id": project.id},
+        expires_delta=refresh_token_expires
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": UserResponse.model_validate(user)
+    }
 
 router.include_router(auth_router)
 
