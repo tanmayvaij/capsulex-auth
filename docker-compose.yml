@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    image: tanmayvaij/capsulex-auth-backend:latest
+    container_name: capsulex-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Automatically pass the variables from your local backend/.env file
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+
+  frontend:
+    image: tanmayvaij/capsulex-auth-frontend:latest
+    container_name: capsulex-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
