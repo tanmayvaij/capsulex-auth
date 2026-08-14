@@ -1,9 +1,13 @@
 {
-  "name": "@capsulex/auth",
+  "name": "capsulex-auth",
   "version": "1.0.0",
   "description": "Official JavaScript/TypeScript SDK for Capsulex Auth",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "node dist/test.js"

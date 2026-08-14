@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useCapsulexAuth } from 'capsulex-auth-sdk/react'
+import { useCapsulexAuth } from 'capsulex-auth/react'
 import { Loader2, LogOut, KeyRound, Mail, ArrowRight, ShieldCheck, UserCircle2 } from 'lucide-react'
 
 function App() {

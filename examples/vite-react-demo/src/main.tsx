@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import { CapsulexProvider } from 'capsulex-auth-sdk/react'
+import { CapsulexProvider } from 'capsulex-auth/react'
 
 const apiKey = import.meta.env.VITE_CAPSULEX_API_KEY || 'demo_api_key'
 
