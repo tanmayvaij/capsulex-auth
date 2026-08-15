@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.base import Base
@@ -12,7 +12,9 @@ class Project(Base):
     api_key = Column(String, unique=True, index=True, nullable=False)
     allowed_origins = Column(JSON, default=list)
     mail_config = Column(JSON, default=dict)
+    allow_public_registration = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     users = relationship("User", back_populates="project", cascade="all, delete-orphan")
     developer = relationship("Developer", back_populates="projects")
+    webhooks = relationship("Webhook", back_populates="project", cascade="all, delete-orphan")

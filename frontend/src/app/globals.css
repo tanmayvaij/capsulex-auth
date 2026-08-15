@@ -39,32 +39,32 @@
 
 @layer base {
   :root {
-    --background: #09090b;
-    --foreground: #fafafa;
+    --background: #000000;
+    --foreground: #ededed;
     
-    --card: #09090b;
-    --card-foreground: #fafafa;
+    --card: #000000;
+    --card-foreground: #ededed;
     
-    --popover: #09090b;
-    --popover-foreground: #fafafa;
+    --popover: #000000;
+    --popover-foreground: #ededed;
     
     --primary: #0d9488;
     --primary-foreground: #ffffff;
     
-    --secondary: #27272a;
-    --secondary-foreground: #fafafa;
+    --secondary: #0a0a0a;
+    --secondary-foreground: #ededed;
     
-    --muted: #1f1f22;
-    --muted-foreground: #a1a1aa;
+    --muted: #0a0a0a;
+    --muted-foreground: #a3a3a3;
     
-    --accent: #27272a;
-    --accent-foreground: #fafafa;
+    --accent: #0a0a0a;
+    --accent-foreground: #ededed;
     
     --destructive: #ef4444;
-    --destructive-foreground: #fafafa;
+    --destructive-foreground: #ededed;
     
-    --border: #27272a;
-    --input: #27272a;
+    --border: #1a1a1a;
+    --input: #1a1a1a;
     --ring: #0d9488;
     
     --radius: 1rem;
@@ -98,15 +98,15 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #262626;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #404040;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #27272a transparent;
+  scrollbar-color: #262626 transparent;
 }

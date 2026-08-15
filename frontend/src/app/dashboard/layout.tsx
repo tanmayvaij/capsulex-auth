@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Loader2, LayoutDashboard, User, Book, LogOut, ShieldCheck } from "lucide-react";
+import { Loader2, LayoutDashboard, User, Book, LogOut, ShieldCheck, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useAppTitle } from "@/hooks/useAppTitle";
 import { apiFetch } from "@/lib/api";
@@ -11,6 +11,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [developer, setDeveloper] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { title } = useAppTitle();
@@ -136,12 +137,75 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile Nav Header */}
         <header className="h-16 border-b border-border/50 bg-card md:hidden flex items-center justify-between px-4">
            <div className="flex items-center gap-3">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-muted-foreground hover:text-foreground">
+              <Menu className="h-5 w-5" />
+            </button>
             <h1 className="font-bold tracking-tight text-foreground">{title}</h1>
           </div>
           <button onClick={handleLogout} className="p-2 text-muted-foreground hover:text-destructive">
             <LogOut className="h-5 w-5" />
           </button>
         </header>
+
+        {/* Mobile Sidebar Overlay */}
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 flex md:hidden">
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+            <div className="relative w-64 max-w-sm flex flex-col bg-card border-r border-border h-full shadow-2xl animate-in slide-in-from-left">
+              <div className="h-16 flex items-center justify-between px-4 border-b border-border/50">
+                <h1 className="font-bold tracking-tight text-foreground">{title}</h1>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 -mr-2 text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
+                {navItems.map((item) => {
+                  const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                  const Icon = item.icon;
+                  
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-3 rounded-full transition-all font-medium whitespace-nowrap ${
+                        isActive 
+                          ? "text-foreground bg-primary/10 text-primary font-bold" 
+                          : "text-muted-foreground hover:text-foreground hover:bg-primary/5"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-full transition-colors shrink-0 ${isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30" : "bg-transparent text-muted-foreground"}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <span>{item.name}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div className="p-3 border-t border-border/50">
+                {developer && (
+                  <div className="flex items-center gap-3 px-3 py-3 mb-2 whitespace-nowrap">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
+                      {developer.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-medium text-foreground truncate">{developer.email}</p>
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors whitespace-nowrap"
+                >
+                  <LogOut className="h-5 w-5 shrink-0" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {children}

@@ -170,65 +170,70 @@ export default function DeveloperDashboardPage() {
               <p className="text-sm mt-1">Create a project using the banner above.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map((project) => (
-                <div key={project.id} className="bg-card border border-border rounded-[1.5rem] relative overflow-hidden hover:shadow-lg transition-all group flex flex-col p-6">
-                  <div className="absolute top-4 right-4 flex gap-2 z-10">
-                    <button
-                      onClick={() => handleDeleteProject(project)}
-                      className="w-8 h-8 rounded-full bg-muted/50 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all"
-                      title="Delete Project"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  
-                  <div className="flex-1 flex flex-col pt-1">
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
-                        Active
-                      </span>
-                      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+            <div className="overflow-x-auto rounded-md border border-border bg-background/30">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border">
+                  <tr>
+                    <th className="px-6 py-5 font-semibold">Project Name</th>
+                    <th className="px-6 py-5 font-semibold">API Key</th>
+                    <th className="px-6 py-5 font-semibold">Users</th>
+                    <th className="px-6 py-5 font-semibold">Created</th>
+                    <th className="px-6 py-5 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {projects.map((project) => (
+                    <tr key={project.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground text-base">{project.name}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">Active</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs font-mono bg-black/40 border border-white/5 px-2 py-1 rounded-lg text-muted-foreground max-w-[200px] truncate">
+                            {project.api_key}
+                          </code>
+                          <button
+                            onClick={() => copyToClipboard(project.api_key)}
+                            className="text-muted-foreground hover:text-primary transition-colors p-1.5 rounded-md hover:bg-primary/10"
+                            title="Copy API Key"
+                          >
+                            {copiedKey === project.api_key ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Users className="h-4 w-4" />
+                          <span className="font-medium">{project.user_count || 0}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground font-medium text-xs">
                         {new Date(project.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    
-                    <h3 className="font-bold text-xl text-foreground mb-2 line-clamp-1 group-hover:text-primary transition-colors pr-10">
-                      {project.name}
-                    </h3>
-                    
-                    <div className="flex items-center gap-1.5 text-muted-foreground mb-6">
-                      <Users className="h-4 w-4" />
-                      <span className="text-sm font-medium">{project.user_count || 0} Users</span>
-                    </div>
-                    
-                    <div className="mt-auto pt-4 border-t border-border/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-muted-foreground">API Key</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 text-xs font-mono bg-background px-3 py-2 rounded-lg text-muted-foreground border border-border/50 truncate">
-                          {project.api_key}
-                        </code>
-                        <button
-                          onClick={() => copyToClipboard(project.api_key)}
-                          className="shrink-0 p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
-                          title="Copy API Key"
-                        >
-                          {copiedKey === project.api_key ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <Link
-                      href={`/dashboard/projects/${project.id}`}
-                      className="mt-4 w-full py-2.5 rounded-xl bg-background border border-border text-center text-sm font-semibold text-foreground hover:bg-primary/5 hover:border-primary/30 transition-all"
-                    >
-                      Manage Users
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Link
+                            href={`/dashboard/projects/${project.id}`}
+                            className="inline-flex items-center justify-center text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-background/50 hover:bg-muted/50 text-foreground transition-colors"
+                          >
+                            Manage
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteProject(project)}
+                            className="inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-1.5 rounded-md transition-colors cursor-pointer"
+                            title="Delete Project"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

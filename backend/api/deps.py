@@ -72,6 +72,14 @@ async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)
     
     if user is None:
         raise credentials_exception
+        
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account suspended"
+        )
+        
+    return user
 async def get_current_admin(request: Request, token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> Admin:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

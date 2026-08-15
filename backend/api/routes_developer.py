@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
@@ -8,9 +8,13 @@ from typing import Any, List
 from db.session import get_db
 from models.developer import Developer
 from models.project import Project
+from models.webhook import Webhook
+from models.config import SystemConfig
 from schemas.developer import DeveloperCreate, DeveloperLogin, DeveloperResponse, DeveloperPasswordUpdate
 from schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
+from schemas.webhook import WebhookCreate, WebhookResponse, WebhookUpdate
 from schemas.user import Token, RefreshRequest
+from schemas.config import SystemConfigPublic
 from core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, ALGORITHM
 from core.config import settings
 from jose import jwt, JWTError
@@ -19,6 +23,13 @@ from core.rate_limit import limiter
 
 developer_router = APIRouter(prefix="/developer", tags=["developer"])
 
+@developer_router.get("/auth/config", response_model=SystemConfigPublic)
+async def get_public_config(db: AsyncSession = Depends(get_db)) -> Any:
+    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "allow_public_registration"))
+    config = result.scalars().first()
+    allow = config.value == "true" if config else True
+    return {"allow_public_registration": allow}
+
 @developer_router.post("/auth/register", response_model=DeveloperResponse)
 @limiter.limit("5/minute")
 async def register_developer(
@@ -26,6 +37,16 @@ async def register_developer(
     dev_in: DeveloperCreate, 
     db: AsyncSession = Depends(get_db)
 ) -> Any:
+    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "allow_public_registration"))
+    config = result.scalars().first()
+    allow_public_registration = config.value == "true" if config else True
+    
+    if not allow_public_registration:
+        raise HTTPException(
+            status_code=403,
+            detail="Public registration is currently disabled."
+        )
+
     hashed_password = get_password_hash(dev_in.password)
     new_dev = Developer(
         email=dev_in.email,
@@ -161,6 +182,101 @@ async def update_password(
     
     return {"message": "Password updated successfully"}
 
+# --- Webhook Routes ---
+
+@developer_router.post("/projects/{project_id}/webhooks", response_model=WebhookResponse)
+async def create_webhook(
+    project_id: int,
+    webhook_in: WebhookCreate,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+):
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    url_str = str(webhook_in.url)
+    existing = await db.execute(select(Webhook).where((Webhook.project_id == project_id) & (Webhook.url == url_str)))
+    if existing.scalars().first():
+        raise HTTPException(status_code=400, detail="A webhook with this URL already exists in this project.")
+
+    new_webhook = Webhook(
+        project_id=project_id,
+        url=url_str,
+        events=webhook_in.events
+    )
+    db.add(new_webhook)
+    await db.commit()
+    await db.refresh(new_webhook)
+    return new_webhook
+
+@developer_router.get("/projects/{project_id}/webhooks", response_model=List[WebhookResponse])
+async def get_webhooks(
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+):
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = await db.execute(select(Webhook).where(Webhook.project_id == project_id))
+    return result.scalars().all()
+
+@developer_router.delete("/projects/{project_id}/webhooks/{webhook_id}")
+async def delete_webhook(
+    project_id: int,
+    webhook_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+):
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = await db.execute(select(Webhook).where((Webhook.id == webhook_id) & (Webhook.project_id == project_id)))
+    webhook = result.scalars().first()
+    if not webhook:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+
+    await db.delete(webhook)
+    await db.commit()
+    return {"message": "Webhook deleted successfully"}
+
+@developer_router.patch("/projects/{project_id}/webhooks/{webhook_id}", response_model=WebhookResponse)
+async def update_webhook(
+    project_id: int,
+    webhook_id: int,
+    webhook_in: WebhookUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+):
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = await db.execute(select(Webhook).where((Webhook.id == webhook_id) & (Webhook.project_id == project_id)))
+    webhook = result.scalars().first()
+    if not webhook:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+        
+    if webhook_in.url is not None:
+        url_str = str(webhook_in.url)
+        if url_str != webhook.url:
+            existing = await db.execute(select(Webhook).where((Webhook.project_id == project_id) & (Webhook.url == url_str)))
+            if existing.scalars().first():
+                raise HTTPException(status_code=400, detail="A webhook with this URL already exists in this project.")
+            webhook.url = url_str
+
+    webhook.events = webhook_in.events
+    await db.commit()
+    await db.refresh(webhook)
+    return webhook
+
 @developer_router.get("/projects", response_model=List[ProjectResponse])
 async def get_my_projects(
     db: AsyncSession = Depends(get_db),
@@ -241,6 +357,7 @@ async def update_user_status(
     project_id: int,
     user_id: int,
     status_in: UserStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_dev: Developer = Depends(get_current_developer)
 ) -> Any:
@@ -258,6 +375,19 @@ async def update_user_status(
     user.is_active = status_in.is_active
     await db.commit()
     await db.refresh(user)
+    
+    if not user.is_active:
+        from services.webhook import WebhookService
+        user_data = UserResponse.model_validate(user).model_dump()
+        user_data["created_at"] = user_data["created_at"].isoformat()
+        if user_data["last_signed_in"]:
+            user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+            
+        background_tasks.add_task(
+            WebhookService.dispatch_event,
+            db, project_id, "user.suspended", user_data
+        )
+        
     return user
 @developer_router.get("/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(
@@ -297,6 +427,8 @@ async def update_project(
         project.allowed_origins = project_update.allowed_origins
     if project_update.mail_config is not None:
         project.mail_config = project_update.mail_config
+    if project_update.allow_public_registration is not None:
+        project.allow_public_registration = project_update.allow_public_registration
         
     await db.commit()
     await db.refresh(project)
@@ -323,4 +455,77 @@ async def delete_project(
     
     await db.delete(project)
     await db.commit()
-    return None
+
+# --- Analytics & Audit Logs ---
+from models.audit import AuditLog
+from schemas.audit import AuditLogResponse, AnalyticsSummaryResponse
+
+@developer_router.get("/projects/{project_id}/audit-logs", response_model=List[AuditLogResponse])
+async def get_audit_logs(
+    project_id: int,
+    limit: int = 50,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+):
+    # Verify ownership
+    res = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not res.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = await db.execute(
+        select(AuditLog)
+        .where(AuditLog.project_id == project_id)
+        .order_by(AuditLog.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+@developer_router.get("/projects/{project_id}/analytics/summary", response_model=List[AnalyticsSummaryResponse])
+async def get_analytics_summary(
+    project_id: int,
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+):
+    # Verify ownership
+    res = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not res.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Fetch last `days` of logs
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    
+    result = await db.execute(
+        select(AuditLog)
+        .where((AuditLog.project_id == project_id) & (AuditLog.created_at >= cutoff))
+    )
+    logs = result.scalars().all()
+    
+    # Aggregate in Python
+    from collections import defaultdict
+    summary = defaultdict(lambda: {"signups": 0, "logins": 0})
+    
+    for log in logs:
+        # Group by YYYY-MM-DD
+        date_str = log.created_at.strftime("%Y-%m-%d")
+        if log.event_type == "user.created":
+            summary[date_str]["signups"] += 1
+        elif log.event_type == "user.login.success":
+            summary[date_str]["logins"] += 1
+            
+    # Generate list of last N days, even if empty, to make charts look nice
+    chart_data = []
+    for i in range(days - 1, -1, -1):
+        d = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        chart_data.append(
+            AnalyticsSummaryResponse(
+                date=d,
+                signups=summary[d]["signups"],
+                logins=summary[d]["logins"]
+            )
+        )
+        
+    return chart_data

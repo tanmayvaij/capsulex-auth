@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, ShieldCheck, CheckCircle2, AlertCircle, Settings as SettingsIcon } from "lucide-react";
 import { useAppTitle } from "@/hooks/useAppTitle";
 import { apiFetch } from "@/lib/api";
 
@@ -12,6 +12,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [activeTab, setActiveTab] = useState<"security" | "platform">("security");
+  const [allowPublicRegistration, setAllowPublicRegistration] = useState(true);
+  const [configLoading, setConfigLoading] = useState(false);
 
   useEffect(() => {
     if (successMsg || errorMsg) {
@@ -22,6 +25,21 @@ export default function SettingsPage() {
       return () => clearTimeout(timer);
     }
   }, [successMsg, errorMsg]);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await apiFetch("/api/admin/auth/config", { role: "admin" });
+        if (res.ok) {
+          const data = await res.json();
+          setAllowPublicRegistration(data.allow_public_registration);
+        }
+      } catch (error) {
+        console.error("Failed to load config", error);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,10 +95,18 @@ export default function SettingsPage() {
 
       <div className="flex border-b border-border w-full gap-6">
         <button 
-          className="pb-4 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors border-primary text-foreground"
+          onClick={() => setActiveTab("security")}
+          className={`pb-4 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "security" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
           <ShieldCheck className="h-4 w-4" />
           Security Options
+        </button>
+        <button 
+          onClick={() => setActiveTab("platform")}
+          className={`pb-4 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "platform" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        >
+          <SettingsIcon className="h-4 w-4" />
+          Platform Configuration
         </button>
       </div>
 
@@ -99,6 +125,7 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {activeTab === "security" && (
         <form onSubmit={handlePasswordReset} className="space-y-6 max-w-md animate-in fade-in duration-300">
           <div>
             <h3 className="text-xl font-semibold mb-1 text-foreground flex items-center gap-2">
@@ -150,7 +177,52 @@ export default function SettingsPage() {
             </button>
           </div>
         </form>
+        )}
 
+        {activeTab === "platform" && (
+        <div className="space-y-6 max-w-2xl animate-in fade-in duration-300">
+          <div>
+            <h3 className="text-xl font-semibold mb-1 text-foreground flex items-center gap-2">
+              Registration Settings
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">Control how developers can access the platform.</p>
+          </div>
+
+          <div className="flex items-center justify-between p-5 border border-border bg-background/30 rounded-lg">
+            <div className="space-y-0.5">
+              <h4 className="text-sm font-semibold text-foreground">Allow Public Registration</h4>
+              <p className="text-xs text-muted-foreground">If disabled, new developers cannot sign up and the registration page will be hidden.</p>
+            </div>
+            
+            <button
+              onClick={async () => {
+                const newVal = !allowPublicRegistration;
+                setConfigLoading(true);
+                try {
+                  const res = await apiFetch("/api/admin/auth/config", {
+                    method: "PATCH",
+                    role: "admin",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ allow_public_registration: newVal })
+                  });
+                  if (res.ok) {
+                    setAllowPublicRegistration(newVal);
+                    setSuccessMsg(`Public registration has been ${newVal ? 'enabled' : 'disabled'}.`);
+                  }
+                } catch (e) {
+                  setErrorMsg("Failed to update registration settings.");
+                } finally {
+                  setConfigLoading(false);
+                }
+              }}
+              disabled={configLoading}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 ${allowPublicRegistration ? 'bg-primary' : 'bg-muted'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${allowPublicRegistration ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        </div>
+        )}
       </div>
     </div>
   );

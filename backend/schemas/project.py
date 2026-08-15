@@ -7,14 +7,16 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     allowed_origins: list[str] | None = None
     mail_config: dict | None = None
+    allow_public_registration: bool | None = None
 
 class ProjectResponse(BaseModel):
     id: int
     name: str
     api_key: str
     developer_id: int
-    allowed_origins: list[str]
-    mail_config: dict
+    allowed_origins: list[str] | None = None
+    mail_config: dict | None = None
+    allow_public_registration: bool
     created_at: datetime
     
     class Config:

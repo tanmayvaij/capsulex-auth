@@ -16,6 +16,26 @@ export default function DeveloperRegisterPage() {
   const [error, setError] = useState("");
   const router = useRouter();
   const { title } = useAppTitle();
+  const [checkingConfig, setCheckingConfig] = useState(true);
+
+  useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/config`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.allow_public_registration) {
+            router.push("/login");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check config", err);
+      } finally {
+        setCheckingConfig(false);
+      }
+    };
+    checkConfig();
+  }, [router]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +83,14 @@ export default function DeveloperRegisterPage() {
       setLoading(false);
     }
   };
+
+  if (checkingConfig) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">

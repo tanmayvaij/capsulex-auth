@@ -15,6 +15,7 @@ export default function DeveloperLoginPage() {
   const router = useRouter();
   const { title } = useAppTitle();
   const [checkingSetup, setCheckingSetup] = useState(true);
+  const [allowPublicRegistration, setAllowPublicRegistration] = useState(true);
 
   useEffect(() => {
     const checkSetup = async () => {
@@ -27,8 +28,15 @@ export default function DeveloperLoginPage() {
             return;
           }
         }
+        
+        // Also fetch config
+        const configRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/developer/auth/config`);
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          setAllowPublicRegistration(configData.allow_public_registration);
+        }
       } catch (err) {
-        console.error("Failed to check admin setup", err);
+        console.error("Failed to check setup or config", err);
       } finally {
         setCheckingSetup(false);
       }
@@ -146,12 +154,14 @@ export default function DeveloperLoginPage() {
         </form>
         
         <div className="mt-6 text-center text-sm flex flex-col space-y-3">
-          <div>
-            <span className="text-muted-foreground">Don't have an account? </span>
-            <Link href="/register" className="text-primary hover:underline font-medium">
-              Sign up
-            </Link>
-          </div>
+          {allowPublicRegistration && (
+            <div>
+              <span className="text-muted-foreground">Don't have an account? </span>
+              <Link href="/register" className="text-primary hover:underline font-medium">
+                Sign up
+              </Link>
+            </div>
+          )}
           <div>
             <span className="text-muted-foreground">Need help integrating? </span>
             <Link href="/docs" className="text-primary hover:underline font-medium">

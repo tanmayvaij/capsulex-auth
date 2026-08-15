@@ -18,8 +18,13 @@ The auth landscape is typically split between heavy, complex open-source tools (
 
 - **Multi-Tenant Architecture**: Developers can create multiple "Projects." Each project acts as its own distinct environment with completely isolated end-users and configuration settings.
 - **Enterprise Mail Configuration**: Dynamically configure your email providers directly from the dashboard. Currently supports **Resend**, **ZeptoMail**, or a local console fallback. The database utilizes a highly scalable JSONB architecture to seamlessly adapt to future providers.
-- **Developer Dashboard**: A centralized Next.js portal to manage projects, track user metrics, and configure CORS domains.
-- **Admin Portal**: A super-admin interface to oversee all registered developers on the platform.
+- **Real-Time Webhooks Engine**: Broadcasts critical lifecycle events (`user.created`, `user.login.success`, `user.password.reset`, etc.) directly to developer-configured endpoints via HTTP `POST` requests.
+- **Granular Registration Controls**: 
+  - *Platform-Level*: Master admins can completely disable public developer registration to lock down the platform.
+  - *Project-Level*: Developers can disable public end-user signups to create private, invite-only applications.
+- **Premium "OLED" Aesthetic**: The entire platform features a stunning, modern "developer-first" true-black UI design, offering a cohesive and high-end experience out of the box.
+- **Developer Dashboard**: A centralized Next.js portal to manage projects, track user metrics, manage webhooks, and configure CORS domains.
+- **Admin Portal**: A super-admin interface to oversee all registered developers and enforce platform-wide settings.
 - **Official NPM SDK**: A world-class React SDK (`capsulex-auth`) featuring Firebase-like observer patterns (`useCapsulexAuth`) and a plug-and-play `<CapsulexProvider>`.
 
 ---
@@ -42,6 +47,24 @@ Critical endpoints are strictly protected by `slowapi` to prevent brute-force at
 
 ### 4. Dynamic CORS & API Keys
 When integrating tenant applications, CapsuleX issues Project API Keys. It uses dynamic CORS checking to intercept and validate requests against a project's configured "Authorized Domains" (e.g., preventing a malicious website from making API requests using a stolen public API key).
+
+---
+
+## 📡 Deep Dive: Real-Time Webhooks
+
+CapsuleX Auth doesn't just manage users; it allows your external services to instantly react to user events via HTTP `POST` webhooks.
+
+### Supported Events
+Developers can subscribe to the following events on a per-project basis:
+- `user.created`: Triggered when a new end-user successfully verifies their OTP and creates an account.
+- `user.deleted`: Triggered when a user is deleted (either manually via admin or via API).
+- `user.login.success`: Triggered when a user successfully authenticates.
+- `user.login.failed`: Triggered when a user fails authentication (e.g. invalid OTP).
+- `user.password.reset`: Triggered when a user successfully resets their authentication credentials.
+- `user.suspended`: Triggered when a user's account is suspended by an administrator.
+
+### Webhook Payloads
+All webhooks are sent as JSON `POST` requests. The payload includes the event type and the associated user data, allowing your backend systems to instantly sync user records, trigger welcome emails, or flag suspicious login attempts.
 
 ---
 

@@ -1,6 +1,6 @@
 import secrets
 import string
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_
@@ -17,12 +17,15 @@ from schemas.project import ProjectCreate, ProjectResponse, AdminProjectResponse
 from models.user import User
 from models.project import Project
 from models.admin import Admin
+from models.config import SystemConfig
 from schemas.admin import AdminLogin, AdminResponse, AdminPasswordUpdate, AdminSettingsUpdate, AdminSetup
+from schemas.config import SystemConfigPublic, SystemConfigUpdate
 from core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, ALGORITHM
 from jose import jwt, JWTError
 from core.config import settings
 from api.deps import get_current_user, get_project_from_api_key, get_current_admin
 from services.email import get_email_service, BaseEmailService
+from services.audit import AuditService
 from core.rate_limit import limiter
 
 router = APIRouter()
@@ -38,6 +41,12 @@ async def register(
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key)
 ) -> Any:
+    if not project.allow_public_registration:
+        raise HTTPException(
+            status_code=403,
+            detail="Public registration is disabled for this project."
+        )
+
     hashed_password = get_password_hash(user_in.password)
     verification_token = secrets.token_urlsafe(32)
     
@@ -52,6 +61,16 @@ async def register(
         await db.commit()
         await db.refresh(new_user)
         
+        # Log event
+        await AuditService.log_event(
+            db=db,
+            project_id=project.id,
+            event_type="user.created",
+            user_id=str(new_user.id),
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent")
+        )
+        
         return new_user
     except IntegrityError:
         await db.rollback()
@@ -65,6 +84,7 @@ async def register(
 async def login(
     request: Request,
     user_in: UserLogin, 
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key)
 ) -> Any:
@@ -76,6 +96,25 @@ async def login(
     user = result.scalars().first()
     
     if not user or not verify_password(user_in.password, user.hashed_password):
+        if user:
+            from services.webhook import WebhookService
+            user_data = UserResponse.model_validate(user).model_dump()
+            user_data["created_at"] = user_data["created_at"].isoformat()
+            if user_data["last_signed_in"]:
+                user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+            background_tasks.add_task(WebhookService.dispatch_event, db, project.id, "user.login.failed", user_data)
+            
+            # Log failure
+            await AuditService.log_event(
+                db=db,
+                project_id=project.id,
+                event_type="user.login.failed",
+                user_id=str(user.id),
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+                metadata={"reason": "Incorrect password"}
+            )
+            
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -90,6 +129,23 @@ async def login(
     from sqlalchemy.sql import func
     user.last_signed_in = func.now()
     await db.commit()
+    
+    from services.webhook import WebhookService
+    user_data = UserResponse.model_validate(user).model_dump()
+    user_data["created_at"] = user_data["created_at"].isoformat()
+    if user_data["last_signed_in"]:
+        user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+    background_tasks.add_task(WebhookService.dispatch_event, db, project.id, "user.login.success", user_data)
+    
+    # Log success
+    await AuditService.log_event(
+        db=db,
+        project_id=project.id,
+        event_type="user.login.success",
+        user_id=str(user.id),
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
     
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
@@ -119,6 +175,32 @@ async def refresh_user_token(
 @auth_router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)) -> Any:
     return current_user
+
+@auth_router.delete("/me")
+@limiter.limit("3/minute")
+async def delete_me(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    from services.webhook import WebhookService
+    user_data = UserResponse.model_validate(current_user).model_dump()
+    user_data["created_at"] = user_data["created_at"].isoformat()
+    if user_data["last_signed_in"]:
+        user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+    
+    project_id = current_user.project_id
+    
+    await db.delete(current_user)
+    await db.commit()
+    
+    background_tasks.add_task(
+        WebhookService.dispatch_event,
+        db, project_id, "user.deleted", user_data
+    )
+    
+    return {"message": "Account deleted successfully"}
 
 @auth_router.post("/send-verification-email")
 @limiter.limit("3/minute")
@@ -194,6 +276,7 @@ async def forgot_password(
 async def reset_password(
     request: Request,
     req: ResetPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     result = await db.execute(select(User).where(User.reset_password_token == req.token))
@@ -210,6 +293,13 @@ async def reset_password(
     user.reset_password_token = None
     user.reset_password_expires_at = None
     await db.commit()
+    
+    from services.webhook import WebhookService
+    user_data = UserResponse.model_validate(user).model_dump()
+    user_data["created_at"] = user_data["created_at"].isoformat()
+    if user_data["last_signed_in"]:
+        user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+    background_tasks.add_task(WebhookService.dispatch_event, db, user.project_id, "user.password.reset", user_data)
     
     return {"message": "Password has been reset successfully"}
 
@@ -255,6 +345,7 @@ async def verify_otp(
     request: Request,
     response: Response,
     req: OTPVerifyRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key)
 ) -> Any:
@@ -268,11 +359,31 @@ async def verify_otp(
         raise HTTPException(status_code=400, detail="Account is disabled")
         
     if not user.otp_code or user.otp_code != req.otp_code:
+        from services.webhook import WebhookService
+        user_data = UserResponse.model_validate(user).model_dump()
+        user_data["created_at"] = user_data["created_at"].isoformat()
+        if user_data["last_signed_in"]:
+            user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+        background_tasks.add_task(WebhookService.dispatch_event, db, project.id, "user.login.failed", user_data)
+        
+        # Log failure
+        await AuditService.log_event(
+            db=db,
+            project_id=project.id,
+            event_type="user.login.failed",
+            user_id=str(user.id),
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            metadata={"reason": "Invalid email or OTP"}
+        )
+        
         raise HTTPException(status_code=401, detail="Invalid email or OTP")
         
     if user.otp_expires_at is None or user.otp_expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="OTP has expired")
         
+    was_verified = user.is_email_verified
+    
     # Valid OTP
     user.otp_code = None
     user.otp_expires_at = None
@@ -281,17 +392,45 @@ async def verify_otp(
     
     await db.commit()
     
+    if not was_verified:
+        from services.webhook import WebhookService
+        user_data = UserResponse.model_validate(user).model_dump()
+        user_data["created_at"] = user_data["created_at"].isoformat()
+        if user_data["last_signed_in"]:
+            user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+            
+        background_tasks.add_task(
+            WebhookService.dispatch_event,
+            db, project.id, "user.created", user_data
+        )
+        
+    user_data = UserResponse.model_validate(user).model_dump()
+    user_data["created_at"] = user_data["created_at"].isoformat()
+    if user_data["last_signed_in"]:
+        user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+    background_tasks.add_task(WebhookService.dispatch_event, db, project.id, "user.login.success", user_data)
+    
+    # Log success
+    await AuditService.log_event(
+        db=db,
+        project_id=project.id,
+        event_type="user.login.success",
+        user_id=str(user.id),
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+    
     # Generate tokens
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id, "role": "user", "project_id": project.id},
+        subject=user.id,
+        extra_claims={"role": "user", "project_id": project.id},
         expires_delta=access_token_expires
     )
     
-    refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     refresh_token = create_refresh_token(
-        data={"sub": user.id, "role": "user", "project_id": project.id},
-        expires_delta=refresh_token_expires
+        subject=user.id,
+        extra_claims={"role": "user", "project_id": project.id}
     )
 
     return {
@@ -529,6 +668,7 @@ async def delete_developer(
 async def update_user_status(
     user_id: str,
     status_update: UserStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin)
 ) -> Any:
@@ -540,6 +680,19 @@ async def update_user_status(
     user.is_active = status_update.is_active
     await db.commit()
     await db.refresh(user)
+    
+    if not user.is_active:
+        from services.webhook import WebhookService
+        user_data = UserResponse.model_validate(user).model_dump()
+        user_data["created_at"] = user_data["created_at"].isoformat()
+        if user_data["last_signed_in"]:
+            user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+            
+        background_tasks.add_task(
+            WebhookService.dispatch_event,
+            db, user.project_id, "user.suspended", user_data
+        )
+        
     return user
 
 @admin_auth_router.patch("/password", response_model=AdminResponse)
@@ -566,6 +719,36 @@ async def get_admin_settings(
     return current_admin
 
 
+
+@admin_auth_router.get("/config", response_model=SystemConfigPublic)
+async def get_system_config(
+    db: AsyncSession = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin)
+) -> Any:
+    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "allow_public_registration"))
+    config = result.scalars().first()
+    allow = config.value == "true" if config else True
+    return {"allow_public_registration": allow}
+
+@admin_auth_router.patch("/config", response_model=SystemConfigPublic)
+async def update_system_config(
+    config_in: SystemConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin)
+) -> Any:
+    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "allow_public_registration"))
+    config = result.scalars().first()
+    
+    val_str = "true" if config_in.allow_public_registration else "false"
+    
+    if config:
+        config.value = val_str
+    else:
+        config = SystemConfig(key="allow_public_registration", value=val_str)
+        db.add(config)
+        
+    await db.commit()
+    return {"allow_public_registration": config_in.allow_public_registration}
 
 router.include_router(admin_auth_router)
 
