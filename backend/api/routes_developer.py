@@ -184,7 +184,8 @@ async def create_project(
         name=project_in.name,
         api_key=api_key,
         developer_id=current_dev.id,
-        allowed_origins=[]
+        allowed_origins=[],
+        mail_config={"provider": "none"}
     )
     db.add(new_project)
     await db.commit()
@@ -294,12 +295,8 @@ async def update_project(
         
     if project_update.allowed_origins is not None:
         project.allowed_origins = project_update.allowed_origins
-    if project_update.mail_provider is not None:
-        project.mail_provider = project_update.mail_provider
-    if project_update.zeptomail_api_key is not None:
-        project.zeptomail_api_key = project_update.zeptomail_api_key
-    if project_update.zeptomail_from_address is not None:
-        project.zeptomail_from_address = project_update.zeptomail_from_address
+    if project_update.mail_config is not None:
+        project.mail_config = project_update.mail_config
         
     await db.commit()
     await db.refresh(project)
