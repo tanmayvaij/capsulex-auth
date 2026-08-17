@@ -18,3 +18,4 @@ class Project(Base):
     users = relationship("User", back_populates="project", cascade="all, delete-orphan")
     developer = relationship("Developer", back_populates="projects")
     webhooks = relationship("Webhook", back_populates="project", cascade="all, delete-orphan")
+    roles = relationship("models.rbac.Role", back_populates="project", cascade="all, delete-orphan")

@@ -325,8 +325,12 @@ async def get_project_users(
     if not result.scalars().first():
         raise HTTPException(status_code=404, detail="Project not found")
         
+    from sqlalchemy.orm import selectinload
     result = await db.execute(
-        select(User).where(User.project_id == project_id).order_by(User.created_at.desc())
+        select(User)
+        .options(selectinload(User.roles))
+        .where(User.project_id == project_id)
+        .order_by(User.created_at.desc())
     )
     return result.scalars().all()
 
@@ -389,6 +393,90 @@ async def update_user_status(
         )
         
     return user
+
+from schemas.session import SessionResponse
+
+@developer_router.get("/projects/{project_id}/users/{user_id}/sessions", response_model=List[SessionResponse])
+async def get_user_sessions(
+    project_id: int,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> Any:
+    # Verify project ownership
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    from models.user import User
+    result = await db.execute(select(User).where((User.id == user_id) & (User.project_id == project_id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from models.session import Session
+    from sqlalchemy import desc
+    result = await db.execute(
+        select(Session)
+        .where(Session.user_id == user_id)
+        .order_by(desc(Session.last_active_at))
+    )
+    return result.scalars().all()
+
+@developer_router.delete("/projects/{project_id}/users/{user_id}/sessions/{session_id}")
+async def revoke_user_session(
+    project_id: int,
+    user_id: str,
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> Any:
+    # Verify project ownership
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    from models.user import User
+    result = await db.execute(select(User).where((User.id == user_id) & (User.project_id == project_id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from models.session import Session
+    result = await db.execute(select(Session).where((Session.id == session_id) & (Session.user_id == user_id)))
+    session = result.scalars().first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    session.is_revoked = True
+    await db.commit()
+    return {"message": "Session revoked"}
+
+@developer_router.delete("/projects/{project_id}/users/{user_id}/sessions")
+async def revoke_all_user_sessions(
+    project_id: int,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> Any:
+    # Verify project ownership
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    from models.user import User
+    result = await db.execute(select(User).where((User.id == user_id) & (User.project_id == project_id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from models.session import Session
+    result = await db.execute(select(Session).where(Session.user_id == user_id))
+    sessions = result.scalars().all()
+    
+    for session in sessions:
+        session.is_revoked = True
+        
+    await db.commit()
+    return {"message": "All sessions revoked"}
 @developer_router.get("/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: int,
@@ -529,3 +617,169 @@ async def get_analytics_summary(
         )
         
     return chart_data
+
+# ==========================================
+# ROLES & PERMISSIONS (RBAC)
+# ==========================================
+from schemas.rbac import RoleCreate, RoleResponse, RoleUpdate, UserRoleUpdate
+from models.rbac import Role, Permission
+from sqlalchemy.orm import selectinload
+import uuid
+
+@developer_router.get("/projects/{project_id}/roles", response_model=List[RoleResponse])
+async def get_project_roles(
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> Any:
+    # Verify project ownership
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = await db.execute(
+        select(Role)
+        .options(selectinload(Role.permissions))
+        .where(Role.project_id == project_id)
+    )
+    return result.scalars().all()
+
+@developer_router.post("/projects/{project_id}/roles", response_model=RoleResponse)
+async def create_project_role(
+    project_id: int,
+    role_in: RoleCreate,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> Any:
+    # Verify project ownership
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Check if role exists
+    result = await db.execute(select(Role).where((Role.project_id == project_id) & (Role.name == role_in.name)))
+    if result.scalars().first():
+        raise HTTPException(status_code=400, detail="Role with this name already exists")
+        
+    perms = []
+    # Process permissions
+    for action in role_in.permissions:
+        # Get or create permission
+        perm_result = await db.execute(select(Permission).where((Permission.project_id == project_id) & (Permission.action == action)))
+        perm = perm_result.scalars().first()
+        if not perm:
+            perm = Permission(id=f"prm_{uuid.uuid4().hex[:16]}", project_id=project_id, action=action)
+            db.add(perm)
+        perms.append(perm)
+        
+    new_role = Role(
+        id=f"rol_{uuid.uuid4().hex[:16]}",
+        project_id=project_id,
+        name=role_in.name,
+        description=role_in.description,
+        permissions=perms
+    )
+    db.add(new_role)
+        
+    await db.commit()
+    await db.refresh(new_role)
+    # Eager load permissions for response
+    result = await db.execute(select(Role).options(selectinload(Role.permissions)).where(Role.id == new_role.id))
+    return result.scalars().first()
+
+@developer_router.put("/projects/{project_id}/roles/{role_id}", response_model=RoleResponse)
+async def update_project_role(
+    project_id: int,
+    role_id: str,
+    role_in: RoleUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> Any:
+    # Verify project ownership
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = await db.execute(select(Role).options(selectinload(Role.permissions)).where((Role.id == role_id) & (Role.project_id == project_id)))
+    role = result.scalars().first()
+    
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    if role_in.name is not None and role_in.name != role.name:
+        # Check name collision
+        name_check = await db.execute(select(Role).where((Role.project_id == project_id) & (Role.name == role_in.name)))
+        if name_check.scalars().first():
+            raise HTTPException(status_code=400, detail="Role with this name already exists")
+        role.name = role_in.name
+        
+    if role_in.description is not None:
+        role.description = role_in.description
+        
+    if role_in.permissions is not None:
+        role.permissions = [] # Clear existing
+        for action in role_in.permissions:
+            perm_result = await db.execute(select(Permission).where((Permission.project_id == project_id) & (Permission.action == action)))
+            perm = perm_result.scalars().first()
+            if not perm:
+                perm = Permission(id=f"prm_{uuid.uuid4().hex[:16]}", project_id=project_id, action=action)
+                db.add(perm)
+            role.permissions.append(perm)
+            
+    await db.commit()
+    await db.refresh(role)
+    return role
+
+@developer_router.delete("/projects/{project_id}/roles/{role_id}")
+async def delete_project_role(
+    project_id: int,
+    role_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> dict:
+    # Verify project ownership
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = await db.execute(select(Role).where((Role.id == role_id) & (Role.project_id == project_id)))
+    role = result.scalars().first()
+    
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    await db.delete(role)
+    await db.commit()
+    return {"message": "Role deleted successfully"}
+
+@developer_router.put("/projects/{project_id}/users/{user_id}/roles")
+async def assign_user_roles(
+    project_id: int,
+    user_id: str,
+    roles_in: UserRoleUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> Any:
+    # Verify project ownership
+    result = await db.execute(select(Project).where((Project.id == project_id) & (Project.developer_id == current_dev.id)))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    from models.user import User
+    result = await db.execute(select(User).options(selectinload(User.roles)).where((User.id == user_id) & (User.project_id == project_id)))
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Fetch actual roles
+    roles = []
+    for role_name in roles_in.roles:
+        r_result = await db.execute(select(Role).where((Role.project_id == project_id) & (Role.name == role_name)))
+        role = r_result.scalars().first()
+        if role:
+            roles.append(role)
+            
+    user.roles = roles
+    await db.commit()
+    return {"message": "Roles updated successfully"}

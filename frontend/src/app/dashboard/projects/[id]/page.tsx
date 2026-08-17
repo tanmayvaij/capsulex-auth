@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, Trash2, Search, ChevronLeft, ChevronRight, CheckCircle, XCircle, CheckCircle2, Circle, EyeOff, Eye, Globe, Mail, Users as UsersIcon, Plus, Webhook as WebhookIcon, Settings, Activity } from "lucide-react";
+import { Loader2, ArrowLeft, Trash2, Search, ChevronLeft, ChevronRight, CheckCircle, XCircle, CheckCircle2, Circle, EyeOff, Eye, Globe, Mail, Users as UsersIcon, Plus, Webhook as WebhookIcon, Settings, Activity, MonitorSmartphone } from "lucide-react";
 import Link from "next/link";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { apiFetch } from "@/lib/api";
@@ -28,7 +28,26 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
   const [webhookToDelete, setWebhookToDelete] = useState<any>(null);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
+  
+  // Sessions Modal State
+  const [showSessionsModal, setShowSessionsModal] = useState(false);
+  const [selectedUserForSessions, setSelectedUserForSessions] = useState<any>(null);
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const AVAILABLE_EVENTS = ["user.created", "user.deleted", "user.login.success", "user.login.failed", "user.password.reset", "user.suspended"];
+
+  // Roles State
+  const [roles, setRoles] = useState<any[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [editingRole, setEditingRole] = useState<any>(null);
+  const [roleFormName, setRoleFormName] = useState("");
+  const [roleFormDesc, setRoleFormDesc] = useState("");
+  const [roleFormPerms, setRoleFormPerms] = useState<string[]>([]);
+  const [newPermInput, setNewPermInput] = useState("");
+  const [roleToDelete, setRoleToDelete] = useState<any>(null);
+  const [showUserRoleModal, setShowUserRoleModal] = useState(false);
+  const [selectedUserForRoles, setSelectedUserForRoles] = useState<any>(null);
 
   // Mail Config State
   const [mailConfig, setMailConfig] = useState({
@@ -66,10 +85,11 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
       if (!id) return;
 
       try {
-        const [projectRes, usersRes, webhooksRes] = await Promise.all([
+        const [projectRes, usersRes, webhooksRes, rolesRes] = await Promise.all([
           apiFetch(`/api/developer/projects/${id}`),
           apiFetch(`/api/developer/projects/${id}/users`),
-          apiFetch(`/api/developer/projects/${id}/webhooks`)
+          apiFetch(`/api/developer/projects/${id}/webhooks`),
+          apiFetch(`/api/developer/projects/${id}/roles`)
         ]);
 
         if (!projectRes.ok) {
@@ -80,10 +100,12 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
         const projectData = await projectRes.json();
         const usersData = await usersRes.json();
         const webhooksData = await webhooksRes.json();
+        const rolesData = rolesRes.ok ? await rolesRes.json() : [];
         
         setProject(projectData);
         setUsers(usersData);
         setWebhooks(webhooksData || []);
+        setRoles(rolesData || []);
         setAllowPublicRegistration(projectData.allow_public_registration ?? true);
         const mailConf = projectData.mail_config || {};
         setMailConfig({
@@ -147,6 +169,50 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const handleViewSessions = async (userId: string) => {
+    setSelectedUserForSessions(userId);
+    setShowSessionsModal(true);
+    setSessionsLoading(true);
+    try {
+      const res = await apiFetch(`/api/developer/projects/${id}/users/${userId}/sessions`);
+      if (res.ok) {
+        setActiveSessions(await res.json());
+      }
+    } catch (error) {
+      console.error("Failed to fetch sessions", error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const handleRevokeSession = async (sessionId: string) => {
+    if (!selectedUserForSessions) return;
+    try {
+      const res = await apiFetch(`/api/developer/projects/${id}/users/${selectedUserForSessions}/sessions/${sessionId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setActiveSessions(activeSessions.map(s => s.id === sessionId ? { ...s, is_revoked: true } : s));
+      }
+    } catch (error) {
+      console.error("Failed to revoke session", error);
+    }
+  };
+
+  const handleRevokeAllSessions = async () => {
+    if (!selectedUserForSessions) return;
+    try {
+      const res = await apiFetch(`/api/developer/projects/${id}/users/${selectedUserForSessions}/sessions`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setActiveSessions(activeSessions.map(s => ({ ...s, is_revoked: true })));
+      }
+    } catch (error) {
+      console.error("Failed to revoke all sessions", error);
+    }
+  };
+
   const handleDeleteWebhook = async () => {
     if (!webhookToDelete) return;
     setIsDeletingItem(true);
@@ -161,6 +227,87 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
         console.error(err);
     } finally {
         setIsDeletingItem(false);
+    }
+  };
+
+  const handleSaveRole = async () => {
+    if (!roleFormName.trim()) return;
+    setRolesLoading(true);
+    try {
+      const payload = {
+        name: roleFormName,
+        description: roleFormDesc,
+        permissions: roleFormPerms
+      };
+      
+      let res;
+      if (editingRole) {
+        res = await apiFetch(`/api/developer/projects/${id}/roles/${editingRole.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await apiFetch(`/api/developer/projects/${id}/roles`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+      
+      if (res.ok) {
+        const savedRole = await res.json();
+        if (editingRole) {
+          setRoles(roles.map((r: any) => r.id === savedRole.id ? savedRole : r));
+        } else {
+          setRoles([...roles, savedRole]);
+        }
+        setShowRoleModal(false);
+      } else {
+        const err = await res.json();
+        alert(err.detail || "Failed to save role");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRolesLoading(false);
+    }
+  };
+
+  const handleDeleteRole = async () => {
+    if (!roleToDelete) return;
+    setIsDeletingItem(true);
+    try {
+      const res = await apiFetch(`/api/developer/projects/${id}/roles/${roleToDelete.id}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setRoles(roles.filter((r: any) => r.id !== roleToDelete.id));
+        setRoleToDelete(null);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeletingItem(false);
+    }
+  };
+
+  const handleSaveUserRoles = async (userId: string, newRoles: string[]) => {
+    try {
+      const res = await apiFetch(`/api/developer/projects/${id}/users/${userId}/roles`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roles: newRoles })
+      });
+      if (res.ok) {
+        setUsers(users.map(u => u.id === userId ? { ...u, roles: newRoles } : u));
+        setShowUserRoleModal(false);
+      } else {
+        const err = await res.json();
+        alert(err.detail || "Failed to update user roles");
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -206,6 +353,13 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
         >
           <UsersIcon className="h-4 w-4" />
           Users
+        </button>
+        <button 
+          onClick={() => setActiveTab('roles')} 
+          className={`pb-4 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'roles' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          Roles
         </button>
         <button 
           onClick={() => setActiveTab('cors')} 
@@ -642,6 +796,8 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
                   <th className="px-6 py-5 font-semibold">Email</th>
                   <th className="px-6 py-5 font-semibold">Verified</th>
                   <th className="px-6 py-5 font-semibold">Status</th>
+                  <th className="px-6 py-5 font-semibold">Roles</th>
+                  <th className="px-6 py-5 font-semibold">Metadata</th>
                   <th className="px-6 py-5 font-semibold">Last Signed In</th>
                   <th className="px-6 py-5 font-semibold text-right">Actions</th>
                 </tr>
@@ -649,7 +805,7 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
               <tbody className="divide-y divide-border">
                 {paginatedUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                       No users found.
                     </td>
                   </tr>
@@ -686,10 +842,45 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
                           {user.is_active ? 'Active' : 'Inactive'}
                         </button>
                       </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1">
+                          {user.roles && user.roles.length > 0 ? (
+                            user.roles.map((role: string) => (
+                              <span key={role} className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded">
+                                {role}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic">None</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <code className="text-[10px] text-muted-foreground bg-muted/30 px-2 py-1 rounded border border-border truncate block max-w-[120px]" title={JSON.stringify(user.user_metadata || {}, null, 2)}>
+                          {JSON.stringify(user.user_metadata || {})}
+                        </code>
+                      </td>
                       <td className="px-6 py-4 text-muted-foreground text-xs">
                         {user.last_signed_in ? `${new Date(user.last_signed_in).toLocaleDateString()} ${new Date(user.last_signed_in).toLocaleTimeString()}` : '-'}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button
+                          onClick={() => {
+                            setSelectedUserForRoles(user);
+                            setShowUserRoleModal(true);
+                          }}
+                          className="inline-flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 p-2.5 rounded-md transition-colors cursor-pointer"
+                          title="Manage Roles"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleViewSessions(user.id)}
+                          className="inline-flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 p-2.5 rounded-md transition-colors cursor-pointer"
+                          title="View Active Sessions"
+                        >
+                          <MonitorSmartphone className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => setUserToDelete(user.id)}
                           className="inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-2.5 rounded-md transition-colors cursor-pointer"
@@ -729,6 +920,81 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </div>
+      )}
+
+      {activeTab === 'roles' && (
+        <div className="bg-card border border-border rounded-md p-8 shadow-sm animate-in fade-in duration-300">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-xl font-semibold mb-2">Roles & Permissions</h3>
+              <p className="text-sm text-muted-foreground">Define roles and their granular permissions to assign to your users.</p>
+            </div>
+            <button
+              onClick={() => {
+                setEditingRole(null);
+                setRoleFormName('');
+                setRoleFormDesc('');
+                setRoleFormPerms([]);
+                setShowRoleModal(true);
+              }}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Create Role
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {roles.map((role) => (
+              <div key={role.id} className="p-5 border border-border bg-background/50 rounded-xl flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h4 className="text-lg font-semibold">{role.name}</h4>
+                    <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-0.5 rounded">{role.id}</span>
+                  </div>
+                  {role.description && <p className="text-sm text-muted-foreground mb-4">{role.description}</p>}
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {role.permissions?.map((p: any) => (
+                      <span key={p.id} className="text-xs font-medium px-2.5 py-1 bg-primary/10 text-primary border border-primary/20 rounded-md">
+                        {p.action}
+                      </span>
+                    ))}
+                    {(!role.permissions || role.permissions.length === 0) && (
+                      <span className="text-xs text-muted-foreground italic">No permissions assigned</span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingRole(role);
+                      setRoleFormName(role.name);
+                      setRoleFormDesc(role.description || '');
+                      setRoleFormPerms(role.permissions?.map((p: any) => p.action) || []);
+                      setShowRoleModal(true);
+                    }}
+                    className="p-2 text-muted-foreground hover:text-primary transition-colors border border-transparent hover:border-border rounded-md"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setRoleToDelete(role)}
+                    className="p-2 text-muted-foreground hover:text-destructive transition-colors border border-transparent hover:border-border rounded-md"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {roles.length === 0 && (
+              <div className="text-center py-12 border border-dashed border-border rounded-xl">
+                <p className="text-muted-foreground">No roles configured yet.</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {activeTab === 'settings' && (
@@ -1069,6 +1335,302 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
               >
                 {isDeletingItem ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSessionsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-card border border-border rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <MonitorSmartphone className="h-5 w-5 text-indigo-400" />
+                  Active Sessions
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">Manage devices where this user is currently logged in</p>
+              </div>
+              <button 
+                onClick={() => setShowSessionsModal(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleRevokeAllSessions}
+                  disabled={sessionsLoading || activeSessions.length === 0}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Revoke All Sessions
+                </button>
+              </div>
+
+              {sessionsLoading ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : activeSessions.length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-border rounded-lg bg-muted/10">
+                  <MonitorSmartphone className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <h4 className="text-foreground font-medium mb-1">No Active Sessions</h4>
+                  <p className="text-sm text-muted-foreground">This user is not logged in on any devices.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {activeSessions.map((session: any) => (
+                    <div key={session.id} className={`p-4 rounded-lg border flex flex-col md:flex-row md:items-center justify-between gap-4 ${session.is_revoked ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-card'}`}>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-mono text-xs px-2 py-1 rounded-md ${session.is_revoked ? 'bg-destructive/20 text-destructive' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+                            {session.ip_address || 'Unknown IP'}
+                          </span>
+                          {session.is_revoked && (
+                            <span className="text-xs font-medium text-destructive px-2 py-0.5 rounded-full bg-destructive/20">Revoked</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-foreground truncate mt-2" title={session.user_agent}>
+                          {session.user_agent || 'Unknown Device'}
+                        </p>
+                        <div className="text-xs text-muted-foreground flex items-center gap-3 mt-2">
+                          <span>Started: {new Date(session.created_at).toLocaleString()}</span>
+                          <span>Last Active: {new Date(session.last_active_at).toLocaleString()}</span>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        {!session.is_revoked && (
+                          <button
+                            onClick={() => handleRevokeSession(session.id)}
+                            className="px-3 py-1.5 text-xs font-medium rounded border border-border text-foreground hover:bg-destructive hover:border-destructive hover:text-destructive-foreground transition-colors w-full md:w-auto whitespace-nowrap"
+                          >
+                            Revoke Access
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRoleModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-card border border-border rounded-xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+                {editingRole ? 'Edit Role' : 'Create Role'}
+              </h3>
+              <button 
+                onClick={() => setShowRoleModal(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Role Name</label>
+                <input
+                  type="text"
+                  value={roleFormName}
+                  onChange={e => setRoleFormName(e.target.value)}
+                  placeholder="e.g. admin, editor, viewer"
+                  className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Description (Optional)</label>
+                <input
+                  type="text"
+                  value={roleFormDesc}
+                  onChange={e => setRoleFormDesc(e.target.value)}
+                  placeholder="e.g. Full administrative access"
+                  className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Permissions</label>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={newPermInput}
+                    onChange={e => setNewPermInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (newPermInput.trim() && !roleFormPerms.includes(newPermInput.trim())) {
+                          setRoleFormPerms([...roleFormPerms, newPermInput.trim()]);
+                          setNewPermInput('');
+                        }
+                      }
+                    }}
+                    placeholder="e.g. read:users, write:posts"
+                    className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  />
+                  <button
+                    onClick={() => {
+                      if (newPermInput.trim() && !roleFormPerms.includes(newPermInput.trim())) {
+                        setRoleFormPerms([...roleFormPerms, newPermInput.trim()]);
+                        setNewPermInput('');
+                      }
+                    }}
+                    className="h-10 px-4 rounded-md bg-muted text-foreground hover:bg-muted/80 text-sm font-medium transition-colors border border-border"
+                  >
+                    Add
+                  </button>
+                </div>
+                
+                <div className="bg-muted/20 border border-border rounded-md p-3 min-h-[100px] flex flex-wrap gap-2 items-start content-start">
+                  {roleFormPerms.map(perm => (
+                    <span key={perm} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary border border-primary/20 text-xs font-medium">
+                      {perm}
+                      <button onClick={() => setRoleFormPerms(roleFormPerms.filter(p => p !== perm))} className="hover:text-destructive">
+                        <XCircle className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {roleFormPerms.length === 0 && (
+                    <span className="text-sm text-muted-foreground italic w-full text-center mt-6">No permissions added</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-border flex justify-end gap-3 bg-muted/10">
+              <button 
+                onClick={() => setShowRoleModal(false)}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveRole}
+                disabled={rolesLoading || !roleFormName.trim()}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {rolesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Role'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {roleToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-card border border-border rounded-xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 flex flex-col items-center text-center space-y-4">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-2">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <h3 className="text-xl font-semibold text-foreground">Delete Role?</h3>
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to delete the role <span className="font-semibold text-foreground">{roleToDelete.name}</span>? 
+                This will remove the role from any users currently assigned to it. This action cannot be undone.
+              </p>
+            </div>
+            <div className="p-6 bg-muted/30 border-t border-border flex gap-3">
+              <button
+                onClick={() => setRoleToDelete(null)}
+                className="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                disabled={isDeletingItem}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteRole}
+                disabled={isDeletingItem}
+                className="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 h-10 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeletingItem ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {isDeletingItem ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUserRoleModal && selectedUserForRoles && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-card border border-border rounded-xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                  Manage User Roles
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1 truncate max-w-[300px]">{selectedUserForRoles.email}</p>
+              </div>
+              <button 
+                onClick={() => setShowUserRoleModal(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {roles.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">No roles configured in this project.</p>
+                  <button onClick={() => { setShowUserRoleModal(false); setActiveTab('roles'); }} className="text-sm text-primary hover:underline">Go to Roles tab to create one</button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {roles.map(role => {
+                    const hasRole = selectedUserForRoles.roles?.includes(role.name);
+                    return (
+                      <label key={role.id} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${hasRole ? 'border-primary/50 bg-primary/5' : 'border-border bg-card hover:bg-muted/50'}`}>
+                        <div className="mt-0.5 flex items-center h-5">
+                          <input
+                            type="checkbox"
+                            checked={hasRole}
+                            onChange={(e) => {
+                              const newRoles = e.target.checked 
+                                ? [...(selectedUserForRoles.roles || []), role.name]
+                                : (selectedUserForRoles.roles || []).filter((r: string) => r !== role.name);
+                              setSelectedUserForRoles({ ...selectedUserForRoles, roles: newRoles });
+                            }}
+                            className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm text-foreground">{role.name}</div>
+                          {role.description && <div className="text-xs text-muted-foreground mt-0.5">{role.description}</div>}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-border flex justify-end gap-3 bg-muted/10">
+              <button 
+                onClick={() => setShowUserRoleModal(false)}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSaveUserRoles(selectedUserForRoles.id, selectedUserForRoles.roles || [])}
+                disabled={roles.length === 0}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save Assignment
               </button>
             </div>
           </div>

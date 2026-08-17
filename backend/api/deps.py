@@ -61,13 +61,16 @@ async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)
     try:
         payload = jwt.decode(actual_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         user_id_str: str = payload.get("sub")
+        sid: str = payload.get("sid")
         if user_id_str is None:
             raise credentials_exception
-        user_id = int(user_id_str)
+        user_id = str(user_id_str)
+        request.state.sid = sid
     except JWTError:
         raise credentials_exception
         
-    result = await db.execute(select(User).where(User.id == user_id))
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(select(User).options(selectinload(User.roles)).where(User.id == user_id))
     user = result.scalars().first()
     
     if user is None:

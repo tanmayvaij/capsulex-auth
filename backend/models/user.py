@@ -1,6 +1,6 @@
 import string
 import random
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.base import Base
@@ -24,11 +24,14 @@ class User(Base):
     verification_token = Column(String, nullable=True, index=True)
     reset_password_token = Column(String, nullable=True, index=True)
     reset_password_expires_at = Column(DateTime(timezone=True), nullable=True)
+    user_metadata = Column(JSON, default=dict, server_default='{}')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_signed_in = Column(DateTime(timezone=True), nullable=True)
 
     project = relationship("Project")
+    sessions = relationship("models.session.Session", back_populates="user", cascade="all, delete-orphan")
+    roles = relationship("models.rbac.Role", secondary="user_roles", back_populates="users")
 
     __table_args__ = (
         UniqueConstraint('email', 'project_id', name='uq_user_email_project'),

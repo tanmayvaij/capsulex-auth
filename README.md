@@ -155,9 +155,110 @@ To use Capsulex Auth as the backend for your own apps:
      );
    }
    ```
-6. Use the hook to authenticate users via Email OTP:
+6. Use the hook to authenticate users via Email OTP or Passwords, and manage metadata:
    ```tsx
-   import { useCapsulexAuth } from 'capsulex-auth';
+   import { useCapsulexAuth } from 'capsulex-auth/react';
+   import { useState } from 'react';
 
-   const { sendOtp, verifyOtp, user, logout } = useCapsulexAuth();
+   function AuthComponent() {
+     const { 
+       user, isLoading, 
+       register, login, 
+       requestOtp, verifyOtp, 
+       updateMetadata, 
+       getSessions, revokeAllOtherSessions,
+       logout 
+     } = useCapsulexAuth();
+
+     const [email, setEmail] = useState('');
+     const [password, setPassword] = useState('');
+
+     if (isLoading) return <div>Loading...</div>;
+
+     if (!user) {
+       return (
+         <div>
+           {/* Email & Password Registration with Metadata */}
+           <button onClick={() => register(email, password, { role: 'admin', age: 25 })}>
+             Sign Up
+           </button>
+
+           {/* Passwordless OTP Flow */}
+           <button onClick={() => requestOtp(email)}>Send Login Code</button>
+           <button onClick={() => verifyOtp(email, '123456', { first_name: 'John' })}>
+             Verify Code
+           </button>
+         </div>
+       );
+     }
+
+     return (
+       <div>
+         <h1>Welcome back, {user.user_metadata?.first_name || user.email}</h1>
+         
+         {/* Update Profile Metadata */}
+         <button onClick={() => updateMetadata({ theme: 'dark_mode' })}>
+           Enable Dark Mode
+         </button>
+         
+         {/* Manage Active Sessions */}
+         <button onClick={async () => {
+           const sessions = await getSessions();
+           console.log("Active Devices:", sessions);
+         }}>
+           View Active Devices
+         </button>
+         
+         <button onClick={() => revokeAllOtherSessions()}>
+           Log out of all other devices
+         </button>
+
+         <button onClick={logout}>Sign Out</button>
+       </div>
+     );
+   }
    ```
+
+---
+
+## 📚 SDK API Reference
+
+Capsulex Auth provides a robust TypeScript SDK for any JavaScript environment, as well as a specialized React Hook for seamless integration in React/Next.js applications.
+
+### `useCapsulexAuth()` Hook Properties
+
+When you call `const auth = useCapsulexAuth()`, you get access to the following properties and methods:
+
+#### State Variables
+- `user` (Object | null): The currently authenticated user object, or `null` if not logged in. Contains `id`, `email`, `created_at`, `is_email_verified`, and `user_metadata`.
+- `isLoading` (boolean): `true` if the SDK is currently checking for an active session on mount, or if an auth operation is in progress.
+
+#### Authentication Methods
+- `register(email, password, metadata?)`: Creates a new user account with an email and password. Optional `metadata` is a key-value object (JSON) for storing custom user attributes.
+- `login(email, password)`: Authenticates an existing user and establishes a session.
+- `requestOtp(email)`: Initiates a passwordless login flow by sending a 6-digit One-Time Password to the user's email.
+- `verifyOtp(email, code, metadata?)`: Verifies the OTP. If the user does not exist, an account is automatically created (with the optional `metadata`).
+- `logout()`: Destroys the current session and clears all tokens from the browser.
+
+#### User Management Methods
+- `updateMetadata(metadata)`: Updates the currently authenticated user's `user_metadata` JSON object. This performs a shallow merge (it will not overwrite existing keys that aren't specified).
+- `getSessions()`: Returns a promise that resolves to an array of active sessions for the current user. Each session object includes `id`, `ip_address`, `user_agent`, `created_at`, `last_active_at`, and `is_current`.
+- `revokeSession(sessionId)`: Forcefully revokes a specific session across all devices.
+- `revokeAllOtherSessions()`: Forcefully revokes all sessions except for the one currently being used by the device calling the method.
+
+### Vanilla JavaScript SDK (`CapsulexAuth`)
+If you are using Vue, Svelte, Angular, or Vanilla JS, you can instantiate the core SDK directly:
+
+```typescript
+import { CapsulexAuth } from 'capsulex-auth';
+
+const auth = new CapsulexAuth({
+  apiKey: "proj_YOUR_API_KEY_HERE",
+  apiUrl: "http://localhost:8000" // Your backend URL
+});
+
+// Example usage
+await auth.login("user@example.com", "password123");
+const user = auth.getUser();
+```
+The vanilla `CapsulexAuth` class provides the exact same asynchronous methods (`login`, `register`, `requestOtp`, `verifyOtp`, `updateMetadata`, `getSessions`, etc.) as the React Hook, but relies on you to manage your application's reactive state.

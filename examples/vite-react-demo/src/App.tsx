@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCapsulexAuth } from 'capsulex-auth/react'
-import { Loader2, LogOut, KeyRound, Mail, ArrowRight, ShieldCheck, UserCircle2 } from 'lucide-react'
+import { Loader2, LogOut, KeyRound, Mail, ArrowRight, ShieldCheck, UserCircle2, MonitorSmartphone } from 'lucide-react'
 
 function App() {
-  const { user, isLoading, login, requestOtp, verifyOtp, logout } = useCapsulexAuth()
+  const { user, isLoading, login, register, requestOtp, verifyOtp, logout, getSessions, revokeSession, revokeAllOtherSessions } = useCapsulexAuth()
   
   const [activeTab, setActiveTab] = useState<'otp' | 'password'>('otp')
   const [email, setEmail] = useState('')
@@ -12,6 +12,11 @@ function App() {
   const [otpSent, setOtpSent] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [isLogin, setIsLogin] = useState(true)
+  
+  // Sessions State
+  const [activeSessions, setActiveSessions] = useState<any[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,6 +26,22 @@ function App() {
       await login(email, password)
     } catch (err: any) {
       setError(err.message || 'Login failed')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handlePasswordRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError('')
+    try {
+      // The register function in the SDK returns the User object,
+      // but does not log them in. We automatically log them in after registration here.
+      await register(email, password)
+      await login(email, password)
+    } catch (err: any) {
+      setError(err.message || 'Registration failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -52,6 +73,17 @@ function App() {
       setIsSubmitting(false)
     }
   }
+
+  // Fetch sessions when user is available
+  useEffect(() => {
+    if (user) {
+      setSessionsLoading(true)
+      getSessions()
+        .then(data => setActiveSessions(data))
+        .catch(console.error)
+        .finally(() => setSessionsLoading(false))
+    }
+  }, [user])
 
   if (isLoading) {
     return (
@@ -103,6 +135,66 @@ function App() {
             </div>
           </div>
         </div>
+
+        <div className="mt-8 bg-card border border-border rounded-xl p-8 shadow-sm">
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <MonitorSmartphone className="h-5 w-5 text-primary" />
+              Active Sessions
+            </h3>
+            <button
+              onClick={async () => {
+                try {
+                  await revokeAllOtherSessions();
+                  const data = await getSessions();
+                  setActiveSessions(data);
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              disabled={activeSessions.length <= 1}
+              className="text-xs font-medium px-3 py-1.5 bg-destructive/10 text-destructive rounded-md hover:bg-destructive hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Revoke All Others
+            </button>
+          </div>
+
+          {sessionsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeSessions.map((session: any) => (
+                <div key={session.id} className="p-4 rounded-lg border border-border bg-background flex flex-col md:flex-row gap-4 justify-between items-center">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{session.ip_address}</span>
+                      {session.is_current && (
+                        <span className="text-[10px] uppercase font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full tracking-wider">
+                          This Device
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground line-clamp-1">{session.user_agent}</p>
+                    <p className="text-xs text-muted-foreground mt-2">Active: {new Date(session.last_active_at).toLocaleString()}</p>
+                  </div>
+                  {!session.is_current && (
+                    <button
+                      onClick={async () => {
+                        await revokeSession(session.id);
+                        setActiveSessions(activeSessions.filter(s => s.id !== session.id));
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded hover:bg-destructive hover:text-white transition-colors whitespace-nowrap"
+                    >
+                      Revoke Access
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -152,7 +244,7 @@ function App() {
 
         <div className="relative z-10">
           {activeTab === 'password' ? (
-            <form onSubmit={handlePasswordLogin} className="space-y-4">
+            <form onSubmit={isLogin ? handlePasswordLogin : handlePasswordRegister} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium ml-1">Email Address</label>
                 <input
@@ -180,8 +272,18 @@ function App() {
                 disabled={isSubmitting}
                 className="w-full h-12 mt-6 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Sign In'}
+                {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (isLogin ? 'Sign In' : 'Sign Up')}
               </button>
+              
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => { setIsLogin(!isLogin); setError(''); }}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+                </button>
+              </div>
             </form>
           ) : (
             <div>

@@ -1,10 +1,11 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from datetime import datetime
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
+    user_metadata: Optional[dict] = {}
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -16,6 +17,7 @@ class OTPRequest(BaseModel):
 class OTPVerifyRequest(BaseModel):
     email: EmailStr
     otp_code: str
+    user_metadata: Optional[dict] = {}
 
 class UserResponse(BaseModel):
     id: str
@@ -25,9 +27,25 @@ class UserResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     last_signed_in: datetime | None = None
+    user_metadata: Optional[dict] = {}
+    
+    # We will just expose the role names in the response
+    roles: Optional[list] = []
+    
+    @field_validator('roles', mode='before')
+    def extract_role_names(cls, v):
+        if not v:
+            return []
+        # If it's a list of Role objects (ORM), extract names
+        if len(v) > 0 and hasattr(v[0], 'name'):
+            return [role.name for role in v]
+        return v
     
     class Config:
         from_attributes = True
+
+class UserMetadataUpdate(BaseModel):
+    user_metadata: dict
 
 class SendVerificationEmailRequest(BaseModel):
     email: EmailStr

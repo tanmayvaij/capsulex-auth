@@ -6,8 +6,20 @@ export interface User {
   created_at: string;
   updated_at?: string;
   last_signed_in?: string;
+  user_metadata?: Record<string, any>;
+  roles?: string[];
 }
 
+export interface Session {
+  id: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  is_revoked: boolean;
+  created_at: string;
+  last_active_at: string;
+  expires_at: string | null;
+  is_current: boolean;
+}
 export interface AuthResponse {
   access_token: string;
   token_type: string;

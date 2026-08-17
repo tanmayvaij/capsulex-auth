@@ -1,4 +1,4 @@
-import { User, AuthResponse, CapsulexOptions } from './types';
+import { User, AuthResponse, CapsulexOptions, Session } from './types';
 import { Storage } from './storage';
 
 export * from './types';
@@ -50,10 +50,10 @@ export class CapsulexAuth {
   /**
    * Register a new user
    */
-  async register(email: string, password: string): Promise<User> {
+  async register(email: string, password: string, user_metadata?: Record<string, any>): Promise<User> {
     return this.request<User>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, user_metadata })
     });
   }
 
@@ -106,10 +106,10 @@ export class CapsulexAuth {
   /**
    * Verify an OTP code and log the user in
    */
-  async verifyOtp(email: string, otp_code: string): Promise<AuthResponse> {
+  async verifyOtp(email: string, otp_code: string, user_metadata?: Record<string, any>): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>('/api/auth/otp/verify', {
       method: 'POST',
-      body: JSON.stringify({ email, otp_code })
+      body: JSON.stringify({ email, otp_code, user_metadata })
     });
     
     if (response.access_token) {
@@ -126,6 +126,18 @@ export class CapsulexAuth {
   logout(): void {
     this.storage.clearToken();
     this.notifyListeners(null);
+  }
+
+  /**
+   * Update the current user's metadata
+   */
+  async updateMetadata(user_metadata: Record<string, any>): Promise<User> {
+    const response = await this.request<User>('/api/auth/me/metadata', {
+      method: 'PATCH',
+      body: JSON.stringify({ user_metadata })
+    });
+    this.notifyListeners(response);
+    return response;
   }
 
   /**
@@ -188,6 +200,31 @@ export class CapsulexAuth {
   }
 
   /**
+   * Retrieve all active sessions for the current user
+   */
+  async getSessions(): Promise<Session[]> {
+    return this.request<Session[]>('/api/auth/me/sessions');
+  }
+
+  /**
+   * Revoke a specific session
+   */
+  async revokeSession(sessionId: string): Promise<void> {
+    await this.request<{message: string}>(`/api/auth/me/sessions/${sessionId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  /**
+   * Revoke all other active sessions except the current one
+   */
+  async revokeAllOtherSessions(): Promise<void> {
+    await this.request<{message: string}>('/api/auth/me/sessions', {
+      method: 'DELETE'
+    });
+  }
+
+  /**
    * Manually set the auth token
    */
   setToken(token: string): void {
@@ -199,5 +236,66 @@ export class CapsulexAuth {
    */
   getToken(): string | null {
     return this.storage.getToken();
+  }
+
+  /**
+   * Helper to decode the current JWT token payload
+   */
+  private decodeToken(): any {
+    const token = this.getToken();
+    if (!token) return null;
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      let jsonPayload;
+      if (typeof window !== 'undefined' && typeof window.atob === 'function') {
+          jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+      } else if (typeof Buffer !== 'undefined') {
+          // Node.js environment
+          jsonPayload = Buffer.from(base64, 'base64').toString('utf-8');
+      } else {
+          // Fallback if neither is available
+          return null;
+      }
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Check if the current user has a specific role
+   */
+  hasRole(role: string): boolean {
+    const payload = this.decodeToken();
+    if (!payload || !payload.roles) return false;
+    return payload.roles.includes(role);
+  }
+
+  /**
+   * Check if the current user has a specific permission
+   */
+  hasPermission(permission: string): boolean {
+    const payload = this.decodeToken();
+    if (!payload || !payload.permissions) return false;
+    return payload.permissions.includes(permission);
+  }
+
+  /**
+   * Get all roles for the current user from the token payload
+   */
+  getRoles(): string[] {
+    const payload = this.decodeToken();
+    return payload?.roles || [];
+  }
+
+  /**
+   * Get all permissions for the current user from the token payload
+   */
+  getPermissions(): string[] {
+    const payload = this.decodeToken();
+    return payload?.permissions || [];
   }
 }

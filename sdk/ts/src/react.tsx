@@ -8,6 +8,10 @@ interface CapsulexContextType {
   register: typeof CapsulexAuth.prototype.register;
   requestOtp: typeof CapsulexAuth.prototype.requestOtp;
   verifyOtp: typeof CapsulexAuth.prototype.verifyOtp;
+  updateMetadata: typeof CapsulexAuth.prototype.updateMetadata;
+  getSessions: typeof CapsulexAuth.prototype.getSessions;
+  revokeSession: typeof CapsulexAuth.prototype.revokeSession;
+  revokeAllOtherSessions: typeof CapsulexAuth.prototype.revokeAllOtherSessions;
   logout: () => void;
   auth: CapsulexAuth;
 }
@@ -48,6 +52,10 @@ export const CapsulexProvider: React.FC<CapsulexProviderProps> = ({ apiKey, chil
     register: auth.register.bind(auth),
     requestOtp: auth.requestOtp.bind(auth),
     verifyOtp: auth.verifyOtp.bind(auth),
+    updateMetadata: auth.updateMetadata.bind(auth),
+    getSessions: auth.getSessions.bind(auth),
+    revokeSession: auth.revokeSession.bind(auth),
+    revokeAllOtherSessions: auth.revokeAllOtherSessions.bind(auth),
     logout: auth.logout.bind(auth),
     auth,
   };

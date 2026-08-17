@@ -54,7 +54,8 @@ async def register(
         email=user_in.email,
         hashed_password=hashed_password,
         project_id=project.id,
-        verification_token=verification_token
+        verification_token=verification_token,
+        user_metadata=user_in.user_metadata or {}
     )
     db.add(new_user)
     try:
@@ -88,8 +89,12 @@ async def login(
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key)
 ) -> Any:
+    from sqlalchemy.orm import selectinload
+    from models.rbac import Role
     result = await db.execute(
-        select(User).where(
+        select(User)
+        .options(selectinload(User.roles).selectinload(Role.permissions))
+        .where(
             and_(User.email == user_in.email, User.project_id == project.id)
         )
     )
@@ -147,8 +152,32 @@ async def login(
         user_agent=request.headers.get("user-agent")
     )
     
-    access_token = create_access_token(subject=user.id)
-    refresh_token = create_refresh_token(subject=user.id)
+    from models.session import Session
+    from datetime import datetime, timezone, timedelta
+    from core.security import REFRESH_TOKEN_EXPIRE_DAYS
+    
+    new_session = Session(
+        user_id=user.id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+    db.add(new_session)
+    await db.commit()
+    await db.refresh(new_session)
+    
+    # Extract roles and permissions
+    roles = []
+    permissions = []
+    for r in user.roles:
+        roles.append(r.name)
+        for p in r.permissions:
+            if p.action not in permissions:
+                permissions.append(p.action)
+                
+    extra_claims = {"roles": roles, "permissions": permissions}
+    access_token = create_access_token(subject=user.id, sid=new_session.id, extra_claims=extra_claims)
+    refresh_token = create_refresh_token(subject=user.id, sid=new_session.id)
     return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token}
 
 @auth_router.post("/refresh", response_model=Token)
@@ -164,10 +193,44 @@ async def refresh_user_token(
             raise HTTPException(status_code=401, detail="Invalid token type")
             
         subject = payload.get("sub")
+        sid = payload.get("sid")
         if not subject:
             raise HTTPException(status_code=401, detail="Invalid token payload")
             
-        access_token = create_access_token(subject=subject)
+        if sid:
+            from models.session import Session
+            from sqlalchemy import select
+            from datetime import datetime, timezone
+            result = await db.execute(select(Session).where(Session.id == sid))
+            session = result.scalars().first()
+            if not session or session.is_revoked:
+                raise HTTPException(status_code=401, detail="Session has been revoked")
+            
+            session.last_active_at = datetime.now(timezone.utc)
+            await db.commit()
+            
+        # Fetch user roles for the new access token
+        from sqlalchemy.orm import selectinload
+        from models.rbac import Role
+        user_result = await db.execute(
+            select(User)
+            .options(selectinload(User.roles).selectinload(Role.permissions))
+            .where(User.id == subject)
+        )
+        user = user_result.scalars().first()
+        
+        extra_claims = {}
+        if user:
+            roles = []
+            permissions = []
+            for r in user.roles:
+                roles.append(r.name)
+                for p in r.permissions:
+                    if p.action not in permissions:
+                        permissions.append(p.action)
+            extra_claims = {"roles": roles, "permissions": permissions}
+            
+        access_token = create_access_token(subject=subject, sid=sid, extra_claims=extra_claims)
         return {"access_token": access_token, "token_type": "bearer"}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
@@ -175,6 +238,99 @@ async def refresh_user_token(
 @auth_router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)) -> Any:
     return current_user
+
+from schemas.user import UserMetadataUpdate
+
+@auth_router.patch("/me/metadata", response_model=UserResponse)
+@limiter.limit("10/minute")
+async def update_my_metadata(
+    request: Request,
+    metadata_in: UserMetadataUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    current_user.user_metadata = {**(current_user.user_metadata or {}), **metadata_in.user_metadata}
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+from schemas.session import SessionResponse
+from typing import List
+
+@auth_router.get("/me/sessions", response_model=List[SessionResponse])
+async def get_my_sessions(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    from models.session import Session
+    from sqlalchemy import select, desc
+    
+    result = await db.execute(
+        select(Session)
+        .where(Session.user_id == current_user.id)
+        .order_by(desc(Session.last_active_at))
+    )
+    sessions = result.scalars().all()
+    
+    response = []
+    current_sid = getattr(request.state, 'sid', None)
+    
+    for session in sessions:
+        sess_dict = session.__dict__.copy()
+        sess_dict["is_current"] = (session.id == current_sid)
+        response.append(SessionResponse(**sess_dict))
+        
+    return response
+
+@auth_router.delete("/me/sessions/{session_id}")
+async def revoke_session(
+    session_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    from models.session import Session
+    from sqlalchemy import select
+    
+    result = await db.execute(
+        select(Session).where(Session.id == session_id, Session.user_id == current_user.id)
+    )
+    session = result.scalars().first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    session.is_revoked = True
+    await db.commit()
+    return {"message": "Session revoked"}
+
+@auth_router.delete("/me/sessions")
+async def revoke_all_other_sessions(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    from models.session import Session
+    from sqlalchemy import select
+    
+    current_sid = getattr(request.state, 'sid', None)
+    
+    result = await db.execute(
+        select(Session).where(Session.user_id == current_user.id)
+    )
+    sessions = result.scalars().all()
+    
+    revoked_count = 0
+    for session in sessions:
+        if session.id != current_sid and not session.is_revoked:
+            session.is_revoked = True
+            revoked_count += 1
+            
+    if revoked_count > 0:
+        await db.commit()
+        
+    return {"message": f"Revoked {revoked_count} other sessions"}
 
 @auth_router.delete("/me")
 @limiter.limit("3/minute")
@@ -349,7 +505,13 @@ async def verify_otp(
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key)
 ) -> Any:
-    result = await db.execute(select(User).where(and_(User.email == req.email, User.project_id == project.id)))
+    from sqlalchemy.orm import selectinload
+    from models.rbac import Role
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.roles).selectinload(Role.permissions))
+        .where(and_(User.email == req.email, User.project_id == project.id))
+    )
     user = result.scalars().first()
     
     if not user:
@@ -390,6 +552,9 @@ async def verify_otp(
     user.is_email_verified = True
     user.last_signed_in = datetime.now(timezone.utc)
     
+    if req.user_metadata:
+        user.user_metadata = {**(user.user_metadata or {}), **req.user_metadata}
+
     await db.commit()
     
     if not was_verified:
@@ -421,16 +586,32 @@ async def verify_otp(
     )
     
     # Generate tokens
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    from models.session import Session
+    from datetime import datetime, timezone, timedelta
+    from core.security import REFRESH_TOKEN_EXPIRE_DAYS
+    
+    new_session = Session(
+        user_id=user.id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+    db.add(new_session)
+    await db.commit()
+    await db.refresh(new_session)
+    
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES) if hasattr(settings, 'ACCESS_TOKEN_EXPIRE_MINUTES') else None
     access_token = create_access_token(
         subject=user.id,
         extra_claims={"role": "user", "project_id": project.id},
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
+        sid=new_session.id
     )
     
     refresh_token = create_refresh_token(
         subject=user.id,
-        extra_claims={"role": "user", "project_id": project.id}
+        extra_claims={"role": "user", "project_id": project.id},
+        sid=new_session.id
     )
 
     return {
