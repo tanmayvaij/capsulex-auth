@@ -227,24 +227,45 @@ Capsulex Auth provides a robust TypeScript SDK for any JavaScript environment, a
 
 ### `useCapsulexAuth()` Hook Properties
 
-When you call `const auth = useCapsulexAuth()`, you get access to the following properties and methods:
+When you call `const auth = useCapsulexAuth()`, you get access to the following properties and the **21 core authentication methods** provided by the SDK:
 
 #### State Variables
-- `user` (Object | null): The currently authenticated user object, or `null` if not logged in. Contains `id`, `email`, `created_at`, `is_email_verified`, and `user_metadata`.
-- `isLoading` (boolean): `true` if the SDK is currently checking for an active session on mount, or if an auth operation is in progress.
+- `user` (Object | null): The currently authenticated user object, or `null` if not logged in.
+- `isLoading` (boolean): `true` if the SDK is currently checking for an active session.
+- `auth` (CapsulexAuth): The raw underlying SDK class instance.
 
-#### Authentication Methods
-- `register(email, password, metadata?)`: Creates a new user account with an email and password. Optional `metadata` is a key-value object (JSON) for storing custom user attributes.
+#### 🔐 Authentication Methods
+- `register(email, password, metadata?)`: Creates a new user account with an email and password.
 - `login(email, password)`: Authenticates an existing user and establishes a session.
-- `requestOtp(email)`: Initiates a passwordless login flow by sending a 6-digit One-Time Password to the user's email.
-- `verifyOtp(email, code, metadata?)`: Verifies the OTP. If the user does not exist, an account is automatically created (with the optional `metadata`).
-- `logout()`: Destroys the current session and clears all tokens from the browser.
+- `requestOtp(email)`: Initiates a passwordless login flow by sending a 6-digit OTP.
+- `verifyOtp(email, code, metadata?)`: Verifies the OTP and logs the user in.
+- `logout()`: Destroys the current session and clears all tokens.
 
-#### User Management Methods
-- `updateMetadata(metadata)`: Updates the currently authenticated user's `user_metadata` JSON object. This performs a shallow merge (it will not overwrite existing keys that aren't specified).
-- `getSessions()`: Returns a promise that resolves to an array of active sessions for the current user. Each session object includes `id`, `ip_address`, `user_agent`, `created_at`, `last_active_at`, and `is_current`.
+#### 📧 Account Recovery & Verification Methods
+- `sendVerificationEmail(email)`: Sends an email verification link to a user.
+- `verifyEmail(token)`: Verifies a user's email using a token.
+- `forgotPassword(email)`: Sends a password reset link to a user.
+- `resetPassword(token, new_password)`: Resets a user's password using a token.
+
+#### 👤 User Management Methods
+- `updateMetadata(metadata)`: Updates the currently authenticated user's `user_metadata` JSON object.
+- `getMe(token?)`: Fetches the currently authenticated user's profile from the backend.
+
+#### 📱 Session Management Methods
+- `getSessions()`: Returns an array of active sessions for the current user.
 - `revokeSession(sessionId)`: Forcefully revokes a specific session across all devices.
-- `revokeAllOtherSessions()`: Forcefully revokes all sessions except for the one currently being used by the device calling the method.
+- `revokeAllOtherSessions()`: Forcefully revokes all sessions except the current one.
+
+#### 🛡️ RBAC (Role-Based Access Control) Methods
+- `hasRole(role)`: Instantly checks if the current user has a specific role (decoded from JWT).
+- `hasPermission(permission)`: Instantly checks if the current user has a specific granular permission.
+- `getRoles()`: Returns an array of all roles assigned to the user.
+- `getPermissions()`: Returns an array of all permissions assigned to the user.
+
+#### ⚙️ Token Management & Core Methods
+- `setToken(token)`: Manually sets the authentication token in the storage mechanism.
+- `getToken()`: Retrieves the current authentication token.
+- `onAuthStateChange(callback)`: Registers a listener for authentication state changes (similar to Firebase).
 
 ### Vanilla JavaScript SDK (`CapsulexAuth`)
 If you are using Vue, Svelte, Angular, or Vanilla JS, you can instantiate the core SDK directly:
@@ -262,3 +283,100 @@ await auth.login("user@example.com", "password123");
 const user = auth.getUser();
 ```
 The vanilla `CapsulexAuth` class provides the exact same asynchronous methods (`login`, `register`, `requestOtp`, `verifyOtp`, `updateMetadata`, `getSessions`, etc.) as the React Hook, but relies on you to manage your application's reactive state.
+
+---
+
+## 🌐 REST API Reference
+
+For developers building custom wrappers, CLIs, or integrating from backend servers, Capsulex Auth exposes a beautiful JSON REST API. 
+
+**Authentication Headers:**
+All endpoints strictly require the `X-Api-Key: <YOUR_API_KEY>` header to identify your project. Endpoints that act on a specific user require the `Authorization: Bearer <TOKEN>` header.
+
+### Account Management
+
+#### `POST /api/auth/register`
+Registers a new user with email/password.
+- **Request Body**: `{ "email": "user@example.com", "password": "secure", "user_metadata": {} }`
+- **Response**: `200 OK` Returns the User object.
+
+#### `DELETE /api/auth/me`
+Deletes the currently authenticated user's account.
+- **Headers**: `Authorization: Bearer <TOKEN>`
+- **Response**: `200 OK` `{ "message": "Account deleted successfully" }`
+
+### Standard Authentication
+
+#### `POST /api/auth/login`
+Authenticates a user.
+- **Request Body**: `{ "email": "user@example.com", "password": "secure" }`
+- **Response**: `200 OK` `{ "access_token": "...", "refresh_token": "...", "token_type": "bearer" }`
+
+#### `POST /api/auth/refresh`
+Exchanges a valid refresh token for a new short-lived access token.
+- **Request Body**: `{ "refresh_token": "eyJ..." }`
+- **Response**: `200 OK` `{ "access_token": "...", "token_type": "bearer" }`
+
+### Passwordless (OTP)
+
+#### `POST /api/auth/otp/request`
+Requests a 6-digit OTP code sent via email.
+- **Request Body**: `{ "email": "user@example.com" }`
+- **Response**: `200 OK` `{ "message": "If that email is registered, an OTP has been sent." }`
+
+#### `POST /api/auth/otp/verify`
+Verifies the OTP code and returns JWT tokens.
+- **Request Body**: `{ "email": "user@example.com", "otp_code": "123456", "user_metadata": {} }`
+- **Response**: `200 OK` `{ "access_token": "...", "refresh_token": "...", "token_type": "bearer", "user": { ... } }`
+
+### Account Recovery
+
+#### `POST /api/auth/send-verification-email`
+Triggers an email verification link.
+- **Request Body**: `{ "email": "user@example.com" }`
+- **Response**: `200 OK` `{ "message": "If the user exists, a verification email has been sent." }`
+
+#### `POST /api/auth/verify-email`
+Verifies the token from the email link.
+- **Request Body**: `{ "token": "abc123xyz" }`
+- **Response**: `200 OK` `{ "message": "Email verified successfully" }`
+
+#### `POST /api/auth/forgot-password`
+Sends a password reset link to a user.
+- **Request Body**: `{ "email": "user@example.com" }`
+- **Response**: `200 OK` `{ "message": "If that email is registered, a password reset link has been sent." }`
+
+#### `POST /api/auth/reset-password`
+Resets a password using a valid token.
+- **Request Body**: `{ "token": "abc123xyz", "new_password": "new_secure_password" }`
+- **Response**: `200 OK` `{ "message": "Password has been reset successfully" }`
+
+### User Profile
+
+#### `GET /api/auth/me`
+Retrieves the currently authenticated user's full profile.
+- **Headers**: `Authorization: Bearer <TOKEN>`
+- **Response**: `200 OK` Returns the User object.
+
+#### `PATCH /api/auth/me/metadata`
+Updates a user's custom `user_metadata` JSON blob.
+- **Headers**: `Authorization: Bearer <TOKEN>`
+- **Request Body**: `{ "user_metadata": { "theme": "dark" } }`
+- **Response**: `200 OK` Returns the updated User object.
+
+### Session Management
+
+#### `GET /api/auth/me/sessions`
+Lists all active devices and sessions for the user.
+- **Headers**: `Authorization: Bearer <TOKEN>`
+- **Response**: `200 OK` Returns an array of Session objects.
+
+#### `DELETE /api/auth/me/sessions/{session_id}`
+Revokes a specific session.
+- **Headers**: `Authorization: Bearer <TOKEN>`
+- **Response**: `200 OK` `{ "message": "Session revoked" }`
+
+#### `DELETE /api/auth/me/sessions`
+Revokes all other active sessions except the current one.
+- **Headers**: `Authorization: Bearer <TOKEN>`
+- **Response**: `200 OK` `{ "message": "Revoked X other sessions" }`
