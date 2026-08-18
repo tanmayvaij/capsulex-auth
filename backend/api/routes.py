@@ -363,6 +363,7 @@ async def delete_me(
 async def send_verification_email(
     request: Request,
     req: SendVerificationEmailRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key),
     email_service: BaseEmailService = Depends(get_email_service)
@@ -383,7 +384,7 @@ async def send_verification_email(
         user.verification_token = secrets.token_urlsafe(32)
         await db.commit()
         
-    await email_service.send_verification_email(user.email, user.verification_token)
+    background_tasks.add_task(email_service.send_verification_email, user.email, user.verification_token)
     return {"message": "If the user exists, a verification email has been sent."}
 
 @auth_router.post("/verify-email")
@@ -408,6 +409,7 @@ async def verify_email(
 async def forgot_password(
     request: Request,
     req: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key),
     email_service: BaseEmailService = Depends(get_email_service)
@@ -423,7 +425,7 @@ async def forgot_password(
         user.reset_password_token = reset_token
         user.reset_password_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
         await db.commit()
-        await email_service.send_password_reset_email(user.email, reset_token)
+        background_tasks.add_task(email_service.send_password_reset_email, user.email, reset_token)
         
     return {"message": "If that email is registered, a password reset link has been sent."}
 
@@ -464,6 +466,7 @@ async def reset_password(
 async def request_otp(
     request: Request,
     req: OTPRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(get_project_from_api_key),
     email_service: BaseEmailService = Depends(get_email_service)
@@ -491,7 +494,7 @@ async def request_otp(
     user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     
     await db.commit()
-    await email_service.send_otp_email(user.email, otp_code)
+    background_tasks.add_task(email_service.send_otp_email, user.email, otp_code)
     
     return {"message": "If that email is registered, an OTP has been sent."}
 
