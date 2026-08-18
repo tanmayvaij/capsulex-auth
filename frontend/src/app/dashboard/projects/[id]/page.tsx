@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, Trash2, Search, ChevronLeft, ChevronRight, CheckCircle, XCircle, CheckCircle2, Circle, EyeOff, Eye, Globe, Mail, Users as UsersIcon, Plus, Webhook as WebhookIcon, Settings, Activity, MonitorSmartphone, Download, Copy } from "lucide-react";
+import { Loader2, ArrowLeft, Trash2, Search, ChevronLeft, ChevronRight, CheckCircle, XCircle, CheckCircle2, Circle, EyeOff, Eye, Globe, Mail, Users as UsersIcon, Plus, Webhook as WebhookIcon, Settings, Activity, MonitorSmartphone, Download, Copy, Save } from "lucide-react";
 import Link from "next/link";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { apiFetch } from "@/lib/api";
@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function ProjectUsersPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -73,10 +74,12 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
     apiKey: '',
     fromAddress: '',
     resendApiKey: '',
-    resendFromAddress: ''
+    resendFromAddress: '',
+    otpTemplate: ''
   });
   const [showApiKey, setShowApiKey] = useState(false);
   const [mailSuccess, setMailSuccess] = useState('');
+  const [mailError, setMailError] = useState('');
   const [mailLoading, setMailLoading] = useState(false);
 
   // Settings Config State
@@ -207,7 +210,8 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
             apiKey: mailConf.apiKey || '',
             fromAddress: mailConf.fromAddress || '',
             resendApiKey: mailConf.resendApiKey || '',
-            resendFromAddress: mailConf.resendFromAddress || ''
+            resendFromAddress: mailConf.resendFromAddress || '',
+            otpTemplate: mailConf.otpTemplate || ''
         });
       } catch (error: any) {
         console.error("Failed to fetch project data:", error);
@@ -222,6 +226,7 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
   const handleMailConfigSave = async () => {
     setMailLoading(true);
     setMailSuccess("");
+    setMailError("");
     try {
         const res = await apiFetch(`/api/developer/projects/${id}`, {
             method: "PATCH",
@@ -235,9 +240,12 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
         if (res.ok) {
             setMailSuccess("Mail configuration saved successfully");
             setTimeout(() => setMailSuccess(""), 3000);
+        } else {
+            const data = await res.json();
+            setMailError(data.detail || "Failed to save mail configuration");
         }
     } catch (err) {
-        console.error(err);
+        setMailError("An unexpected error occurred.");
     } finally {
         setMailLoading(false);
     }
@@ -725,18 +733,41 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
                   </div>
                 )}
 
+                {mailConfig.provider !== 'none' && (
+                  <div className="pt-6 border-t border-border space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="space-y-3">
+                      <label className="text-sm font-semibold text-foreground ml-1">Custom OTP Template (HTML)</label>
+                      <Textarea
+                        value={mailConfig.otpTemplate}
+                        onChange={(e) => setMailConfig({...mailConfig, otpTemplate: e.target.value})}
+                        placeholder="<div>Your OTP is {{OTP_CODE}}</div>"
+                        className="min-h-[150px] font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground ml-1">
+                        Optional. Write custom HTML for your OTP email. You <strong>must</strong> include the literal string <code className="bg-muted px-1 py-0.5 rounded">{"{{OTP_CODE}}"}</code> in your template.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="pt-6 flex items-center gap-4">
                   <Button
                     onClick={handleMailConfigSave}
                     disabled={mailLoading}
                   >
-                    {mailLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {mailLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     Save Configuration
                   </Button>
                   {mailSuccess && (
                     <div className="flex items-center gap-2 text-sm text-emerald-500 animate-in fade-in bg-emerald-500/10 px-4 py-2 rounded-md">
                       <CheckCircle2 className="h-4 w-4" />
                       {mailSuccess}
+                    </div>
+                  )}
+                  {mailError && (
+                    <div className="flex items-center gap-2 text-sm text-red-500 animate-in fade-in bg-red-500/10 px-4 py-2 rounded-md">
+                      <XCircle className="h-4 w-4" />
+                      {mailError}
                     </div>
                   )}
                 </div>
@@ -1713,11 +1744,11 @@ export default function ProjectUsersPage({ params }: { params: Promise<{ id: str
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Metadata (Optional JSON)</label>
-                  <textarea 
+                  <Textarea 
                     value={newUserMetadata} 
                     onChange={e => setNewUserMetadata(e.target.value)} 
                     placeholder='{"role": "user", "plan": "pro"}'
-                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="min-h-[80px] font-mono"
                   />
                   <p className="text-xs text-muted-foreground">Custom JSON metadata to attach to the user.</p>
                 </div>

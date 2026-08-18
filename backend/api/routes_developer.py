@@ -570,7 +570,11 @@ async def update_project(
     if project_update.allowed_origins is not None:
         project.allowed_origins = project_update.allowed_origins
     if project_update.mail_config is not None:
-        project.mail_config = project_update.mail_config
+        new_mail_config = project_update.mail_config
+        otp_template = new_mail_config.get("otpTemplate")
+        if otp_template and "{{OTP_CODE}}" not in otp_template:
+            raise HTTPException(status_code=400, detail="The OTP email template must contain the {{OTP_CODE}} variable.")
+        project.mail_config = new_mail_config
     if project_update.allow_public_registration is not None:
         project.allow_public_registration = project_update.allow_public_registration
         

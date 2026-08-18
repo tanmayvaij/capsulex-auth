@@ -14,10 +14,11 @@ class BaseEmailService:
 
 
 class ZeptoMailService(BaseEmailService):
-    def __init__(self, api_key: str, from_address: str):
+    def __init__(self, api_key: str, from_address: str, mail_config: dict = None):
         self.api_url = "https://api.zeptomail.in/v1.1/email"
         self.api_key = api_key
         self.from_address = from_address
+        self.mail_config = mail_config or {}
         
     async def _send_email(self, to_email: str, subject: str, htmlbody: str):
         if not self.api_key or not self.from_address:
@@ -55,23 +56,28 @@ class ZeptoMailService(BaseEmailService):
         await self._send_email(to_email, "Reset Your Password", htmlbody)
 
     async def send_otp_email(self, to_email: str, otp: str):
-        htmlbody = f"""
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #333;">Your Authentication Code</h2>
-            <p>Please use the following 6-digit code to log in to your account. This code will expire in 10 minutes.</p>
-            <div style="background-color: #f4f4f5; padding: 16px; border-radius: 8px; text-align: center; margin: 24px 0;">
-                <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #111;">{otp}</span>
+        custom_template = self.mail_config.get("otpTemplate")
+        if custom_template:
+            htmlbody = custom_template.replace("{{OTP_CODE}}", otp)
+        else:
+            htmlbody = f"""
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #333;">Your Authentication Code</h2>
+                <p>Please use the following 6-digit code to log in to your account. This code will expire in 10 minutes.</p>
+                <div style="background-color: #f4f4f5; padding: 16px; border-radius: 8px; text-align: center; margin: 24px 0;">
+                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #111;">{otp}</span>
+                </div>
+                <p style="color: #666; font-size: 14px;">If you did not request this code, you can safely ignore this email.</p>
             </div>
-            <p style="color: #666; font-size: 14px;">If you did not request this code, you can safely ignore this email.</p>
-        </div>
-        """
+            """
         await self._send_email(to_email, "Your Login Code", htmlbody)
 
 class ResendService(BaseEmailService):
-    def __init__(self, api_key: str, from_address: str):
+    def __init__(self, api_key: str, from_address: str, mail_config: dict = None):
         self.api_url = "https://api.resend.com/emails"
         self.api_key = api_key
         self.from_address = from_address
+        self.mail_config = mail_config or {}
         
     async def _send_email(self, to_email: str, subject: str, htmlbody: str):
         if not self.api_key or not self.from_address:
@@ -106,16 +112,20 @@ class ResendService(BaseEmailService):
         await self._send_email(to_email, "Reset Your Password", htmlbody)
 
     async def send_otp_email(self, to_email: str, otp: str):
-        htmlbody = f"""
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #333;">Your Authentication Code</h2>
-            <p>Please use the following 6-digit code to log in to your account. This code will expire in 10 minutes.</p>
-            <div style="background-color: #f4f4f5; padding: 16px; border-radius: 8px; text-align: center; margin: 24px 0;">
-                <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #111;">{otp}</span>
+        custom_template = self.mail_config.get("otpTemplate")
+        if custom_template:
+            htmlbody = custom_template.replace("{{OTP_CODE}}", otp)
+        else:
+            htmlbody = f"""
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #333;">Your Authentication Code</h2>
+                <p>Please use the following 6-digit code to log in to your account. This code will expire in 10 minutes.</p>
+                <div style="background-color: #f4f4f5; padding: 16px; border-radius: 8px; text-align: center; margin: 24px 0;">
+                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #111;">{otp}</span>
+                </div>
+                <p style="color: #666; font-size: 14px;">If you did not request this code, you can safely ignore this email.</p>
             </div>
-            <p style="color: #666; font-size: 14px;">If you did not request this code, you can safely ignore this email.</p>
-        </div>
-        """
+            """
         await self._send_email(to_email, "Your Login Code", htmlbody)
 
 from fastapi import Depends
@@ -128,25 +138,25 @@ async def get_email_service(project: Project = Depends(get_project_from_api_key)
     
     if provider == "none":
         print(f"⚠️ Mail provider is set to 'none' for project {project.id}. Emails will be skipped.")
-        return ZeptoMailService("", "")
+        return ZeptoMailService("", "", config)
         
     if provider == "resend":
         api_key = config.get("resendApiKey")
         from_address = config.get("resendFromAddress")
         if api_key and from_address:
-            return ResendService(api_key, from_address)
+            return ResendService(api_key, from_address, config)
         else:
             print(f"⚠️ Resend is missing API keys for project {project.id}. Emails will be skipped.")
-            return ResendService("", "")
+            return ResendService("", "", config)
             
     if provider == "zeptomail":
         api_key = config.get("apiKey")
         from_address = config.get("fromAddress")
         if api_key and from_address:
-            return ZeptoMailService(api_key, from_address)
+            return ZeptoMailService(api_key, from_address, config)
         else:
             print(f"⚠️ ZeptoMail is missing API keys for project {project.id}. Emails will be skipped.")
-            return ZeptoMailService("", "")
+            return ZeptoMailService("", "", config)
             
     # Default fallback
-    return ZeptoMailService("", "")
+    return ZeptoMailService("", "", config)
