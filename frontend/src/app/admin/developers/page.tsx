@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { Loader2, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 export default function AdminDevelopersPage() {
   const [developers, setDevelopers] = useState<any[]>([]);
@@ -84,143 +90,134 @@ export default function AdminDevelopersPage() {
     <div className="w-full p-4 lg:p-6 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Developers</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Developers</h1>
           <p className="text-muted-foreground mt-1">Manage all developer accounts.</p>
         </div>
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input 
-            type="text"
+          <Input 
             placeholder="Search by email or ID..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full pl-9 pr-4 py-2 bg-muted/20 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-all"
+            className="pl-9"
           />
         </div>
       </div>
 
-      <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm flex flex-col">
-        <div className="overflow-auto flex-1">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground uppercase bg-muted/20">
-              <tr>
-                <th className="px-6 py-2.5 font-medium">ID</th>
-                <th className="px-6 py-2.5 font-medium">Developer</th>
-                <th className="px-6 py-2.5 font-medium">Status</th>
-                <th className="px-6 py-2.5 font-medium">Created At</th>
-                <th className="px-6 py-2.5 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
+      <Card className="flex flex-col">
+        <CardContent className="p-0 overflow-auto flex-1">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Developer</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created At</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {paginatedDevelopers.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     {searchQuery ? "No developers match your search." : "No developers found."}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 paginatedDevelopers.map(dev => (
-                  <tr key={dev.id} className="hover:bg-muted/10 transition-colors">
-                    <td className="px-6 py-2.5 font-mono text-xs text-muted-foreground">
+                  <TableRow key={dev.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
                       {dev.id}
-                    </td>
-                    <td className="px-6 py-2.5">
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
                           {dev.email.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-medium text-foreground text-sm truncate max-w-[200px] sm:max-w-[300px]">{dev.email}</p>
+                          <p className="font-medium truncate max-w-[200px] sm:max-w-[300px]">{dev.email}</p>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-2.5">
-                      <button 
+                    </TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={dev.is_active ? "outline" : "destructive"} 
+                        className="cursor-pointer"
                         onClick={() => handleToggleDevStatus(dev.id, dev.is_active)}
-                        className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md transition-opacity hover:opacity-80 ${
-                          dev.is_active ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'
-                        }`}
                       >
                         {dev.is_active ? 'Active' : 'Suspended'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-2.5 text-xs text-muted-foreground">
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
                       {new Date(dev.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-2.5 text-right">
-                      <button
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setDevToDelete(dev.id)}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        title="Delete Developer"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </CardContent>
         
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-2.5 border-t border-border/40 bg-muted/5">
+          <div className="flex items-center justify-between px-6 py-3 border-t">
             <p className="text-sm text-muted-foreground">
               Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to <span className="font-medium text-foreground">{Math.min(startIndex + itemsPerPage, filteredDevelopers.length)}</span> of <span className="font-medium text-foreground">{filteredDevelopers.length}</span> developers
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg border border-border/50 text-sm font-medium hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
               >
-                <ChevronLeft className="h-4 w-4" /> Previous
-              </button>
-              <button
+                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg border border-border/50 text-sm font-medium hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
               >
-                Next <ChevronRight className="h-4 w-4" />
-              </button>
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Delete Developer Modal */}
-      {devToDelete !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border/50 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-4 mx-auto">
-              <Trash2 className="h-6 w-6" />
-            </div>
-            <h3 className="text-xl font-bold text-foreground text-center mb-2">Delete Developer?</h3>
-            <p className="text-sm text-muted-foreground text-center mb-6">
+      <Dialog open={!!devToDelete} onOpenChange={(open) => !open && !isDeleting && setDevToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Developer?</DialogTitle>
+            <DialogDescription>
               This will permanently delete this developer account and all associated projects. This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDevToDelete(null)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-border hover:bg-muted/50 transition-colors"
-                disabled={isDeleting}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteDeveloper(devToDelete)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors flex items-center justify-center gap-2"
-                disabled={isDeleting}
-              >
-                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDevToDelete(null)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => handleDeleteDeveloper(devToDelete!)} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

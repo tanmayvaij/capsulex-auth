@@ -6,6 +6,20 @@ import { Loader2, Plus, Copy, CheckCircle2, Trash2, Users, LayoutDashboard, Chev
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 export default function DeveloperDashboardPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [newProjectName, setNewProjectName] = useState("");
@@ -93,180 +107,169 @@ export default function DeveloperDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  // Calculate some dummy stats based on projects for the right panel
   const totalUsers = projects.reduce((acc, p) => acc + (p.user_count || 0), 0);
 
   return (
-    <div className="w-full flex flex-col xl:flex-row gap-6 p-4 sm:p-6 lg:p-8">
+    <div className="flex-1 space-y-6">
       
-      {/* Main Content Area */}
-      <div className="flex-1 space-y-8">
-        
-        {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 bg-card border border-border/60 rounded-2xl p-6 shadow-sm">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-              Developer Dashboard
-            </h1>
-            <p className="text-muted-foreground mt-1">Manage your authentication projects and users.</p>
-          </div>
-          
-          <form onSubmit={handleCreateProject} className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-            <input
-              type="text"
-              placeholder="New Project Name"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              className="flex-1 lg:w-64 h-10 rounded-lg border border-border/50 bg-muted/20 px-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all"
-            />
-            <button
-              type="submit"
-              disabled={creatingProject || !newProjectName.trim()}
-              className="inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-all disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 shrink-0 shadow-sm"
-            >
-              {creatingProject ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Create <ChevronRight className="ml-1 h-4 w-4" /></>}
-            </button>
-          </form>
-        </div>
-
-        {/* Quick Stats Pills */}
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-center gap-3 bg-card border border-border/60 px-6 py-4 rounded-2xl shadow-sm flex-1 min-w-[200px]">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <LayoutDashboard className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-semibold uppercase">Total Projects</p>
-              <p className="text-lg font-bold text-foreground">{projects.length}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 bg-card border border-border/60 px-6 py-4 rounded-2xl shadow-sm flex-1 min-w-[200px]">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Users className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-semibold uppercase">Total Users</p>
-              <p className="text-lg font-bold text-foreground">{totalUsers}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Projects Grid (Continue Watching style) */}
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-foreground">Your Projects</h2>
-          </div>
-          
-          {projects.length === 0 ? (
-            <div className="text-center p-12 border-2 border-dashed border-border rounded-3xl text-muted-foreground flex flex-col items-center">
-              <LayoutDashboard className="h-10 w-10 text-muted-foreground/50 mb-4" />
-              <p className="font-semibold text-foreground text-lg">No projects found</p>
-              <p className="text-sm mt-1">Create a project using the banner above.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-border bg-background/30">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border">
-                  <tr>
-                    <th className="px-6 py-5 font-semibold">Project Name</th>
-                    <th className="px-6 py-5 font-semibold">API Key</th>
-                    <th className="px-6 py-5 font-semibold">Users</th>
-                    <th className="px-6 py-5 font-semibold">Created</th>
-                    <th className="px-6 py-5 font-semibold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {projects.map((project) => (
-                    <tr key={project.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-foreground text-base">{project.name}</span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">Active</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <code className="text-xs font-mono bg-black/40 border border-white/5 px-2 py-1 rounded-lg text-muted-foreground max-w-[200px] truncate">
-                            {project.api_key}
-                          </code>
-                          <button
-                            onClick={() => copyToClipboard(project.api_key)}
-                            className="text-muted-foreground hover:text-primary transition-colors p-1.5 rounded-md hover:bg-primary/10"
-                            title="Copy API Key"
-                          >
-                            {copiedKey === project.api_key ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Users className="h-4 w-4" />
-                          <span className="font-medium">{project.user_count || 0}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground font-medium text-xs">
-                        {new Date(project.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Link
-                            href={`/dashboard/projects/${project.id}`}
-                            className="inline-flex items-center justify-center text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-background/50 hover:bg-muted/50 text-foreground transition-colors"
-                          >
-                            Manage
-                          </Link>
-                          <button
-                            onClick={() => handleDeleteProject(project)}
-                            className="inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-1.5 rounded-md transition-colors cursor-pointer"
-                            title="Delete Project"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <h1 className="text-3xl font-bold tracking-tight">Developer Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Manage your authentication projects and users.</p>
         </div>
+        
+        <form onSubmit={handleCreateProject} className="flex w-full md:w-auto items-center gap-2">
+          <Input
+            type="text"
+            placeholder="New Project Name"
+            value={newProjectName}
+            onChange={(e) => setNewProjectName(e.target.value)}
+            className="w-full md:w-[250px] lg:w-[300px]"
+          />
+          <Button type="submit" disabled={creatingProject || !newProjectName.trim()}>
+            {creatingProject ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+            Create Project
+          </Button>
+        </form>
+      </div>
+
+      {/* Quick Stats Pills */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+            <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{projects.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsers}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Projects Grid */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold tracking-tight">Your Projects</h2>
+        
+        {projects.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center py-12 text-center">
+            <LayoutDashboard className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <div className="text-lg font-semibold">No projects found</div>
+            <p className="text-sm text-muted-foreground mt-1">Create a project using the form above.</p>
+          </Card>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Project Name</TableHead>
+                  <TableHead>API Key</TableHead>
+                  <TableHead>Users</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projects.map((project) => (
+                  <TableRow key={project.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{project.name}</span>
+                        <Badge variant="secondary" className="text-[10px]">Active</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm max-w-[200px] truncate">
+                          {project.api_key}
+                        </code>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => copyToClipboard(project.api_key)}
+                          title="Copy API Key"
+                        >
+                          {copiedKey === project.api_key ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        <span>{project.user_count || 0}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(project.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Link href={`/dashboard/projects/${project.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                          Manage
+                        </Link>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteProject(project)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       {/* Project Delete Modal */}
-      {projectToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-          <div className="bg-card border border-border shadow-lg rounded-2xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
-            <h3 className="text-xl font-bold text-foreground mb-2">Delete Project</h3>
-            <p className="text-muted-foreground text-sm mb-6">
-              Are you sure you want to delete <span className="font-semibold text-foreground">{projectToDelete.name}</span>? All associated users will also be deleted. This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setProjectToDelete(null)}
-                disabled={isDeleting}
-                className="px-4 py-2 text-sm font-medium rounded-lg text-muted-foreground hover:bg-muted/50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteProject}
-                disabled={isDeleting}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors flex items-center gap-2"
-              >
-                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <span className="font-semibold text-foreground">{projectToDelete?.name}</span>? All associated users will also be deleted. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setProjectToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteProject}
+              disabled={isDeleting}
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

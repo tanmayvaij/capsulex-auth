@@ -2,16 +2,40 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Loader2, LayoutDashboard, User, Book, LogOut, ShieldCheck, Menu, X } from "lucide-react";
+import { Loader2, LayoutDashboard, User, LogOut, ChevronRight, ChevronsUpDown, FolderOpen, GalleryVerticalEnd } from "lucide-react";
 import Link from "next/link";
 import { useAppTitle } from "@/hooks/useAppTitle";
 import { apiFetch } from "@/lib/api";
 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarProvider,
+  SidebarTrigger,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ModeToggle } from "@/components/theme-toggle";
+import { Separator } from "@/components/ui/separator";
+import { DynamicBreadcrumb } from "@/components/dynamic-breadcrumb";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [developer, setDeveloper] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { title } = useAppTitle();
@@ -60,157 +84,100 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="min-h-screen flex bg-background">
-      {/* Sidebar */}
-      <aside className={`${isCollapsed ? 'w-20' : 'w-64'} transition-all duration-300 flex-shrink-0 bg-card border-r border-border/50 hidden md:flex flex-col relative`}>
-        {/* Toggle Button */}
-        <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-8 bg-card border border-border/50 rounded-full p-1 text-muted-foreground hover:text-foreground z-10"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`}>
-            <path d="m15 18-6-6 6-6"/>
-          </svg>
-        </button>
-
-        <div className="h-20 flex items-center px-4">
-          <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
-            {!isCollapsed && (
-              <div>
-                <h1 className="font-bold tracking-tight text-foreground">{title}</h1>
-                <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Developer</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <nav className="flex-1 px-3 py-6 space-y-2 overflow-hidden">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
-            const Icon = item.icon;
-            
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-3 rounded-full transition-all font-medium whitespace-nowrap ${
-                  isActive 
-                    ? "text-foreground bg-primary/10 text-primary font-bold" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-primary/5"
-                } ${isCollapsed ? 'justify-center' : ''}`}
-                title={isCollapsed ? item.name : undefined}
-              >
-                <div className={`p-2 rounded-full transition-colors shrink-0 ${isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30" : "bg-transparent text-muted-foreground"}`}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                {!isCollapsed && <span>{item.name}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-border/50 overflow-hidden">
-          {developer && !isCollapsed && (
-            <div className="flex items-center gap-3 px-3 py-3 mb-2 whitespace-nowrap">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
-                {developer.email.charAt(0).toUpperCase()}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-medium text-foreground truncate">{developer.email}</p>
-              </div>
-            </div>
-          )}
-          
-          <button
-            onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-3 py-3 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors whitespace-nowrap ${isCollapsed ? 'justify-center mt-2' : ''}`}
-            title={isCollapsed ? "Sign Out" : undefined}
-          >
-            <LogOut className="h-5 w-5 shrink-0" />
-            {!isCollapsed && <span>Sign Out</span>}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile Nav Header */}
-        <header className="h-16 border-b border-border/50 bg-card md:hidden flex items-center justify-between px-4">
-           <div className="flex items-center gap-3">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-muted-foreground hover:text-foreground">
-              <Menu className="h-5 w-5" />
-            </button>
-            <h1 className="font-bold tracking-tight text-foreground">{title}</h1>
-          </div>
-          <button onClick={handleLogout} className="p-2 text-muted-foreground hover:text-destructive">
-            <LogOut className="h-5 w-5" />
-          </button>
-        </header>
-
-        {/* Mobile Sidebar Overlay */}
-        {isMobileMenuOpen && (
-          <div className="fixed inset-0 z-50 flex md:hidden">
-            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-            <div className="relative w-64 max-w-sm flex flex-col bg-card border-r border-border h-full shadow-2xl animate-in slide-in-from-left">
-              <div className="h-16 flex items-center justify-between px-4 border-b border-border/50">
-                <h1 className="font-bold tracking-tight text-foreground">{title}</h1>
-                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 -mr-2 text-muted-foreground hover:text-foreground">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              
-              <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
-                {navItems.map((item) => {
-                  const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
-                  const Icon = item.icon;
-                  
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-3 rounded-full transition-all font-medium whitespace-nowrap ${
-                        isActive 
-                          ? "text-foreground bg-primary/10 text-primary font-bold" 
-                          : "text-muted-foreground hover:text-foreground hover:bg-primary/5"
-                      }`}
-                    >
-                      <div className={`p-2 rounded-full transition-colors shrink-0 ${isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30" : "bg-transparent text-muted-foreground"}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <span>{item.name}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
-
-              <div className="p-3 border-t border-border/50">
-                {developer && (
-                  <div className="flex items-center gap-3 px-3 py-3 mb-2 whitespace-nowrap">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
-                      {developer.email.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="overflow-hidden">
-                      <p className="text-sm font-medium text-foreground truncate">{developer.email}</p>
-                    </div>
+    <SidebarProvider>
+      <Sidebar collapsible="icon">
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground" />}>
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                    <GalleryVerticalEnd className="size-4" />
                   </div>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors whitespace-nowrap"
-                >
-                  <LogOut className="h-5 w-5 shrink-0" />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">{title}</span>
+                    <span className="truncate text-xs">Developer</span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-(--anchor-width) min-w-56 rounded-lg">
+                  <DropdownMenuItem>
+                     <span>{title} Workspace</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Platform</SidebarGroupLabel>
+            <SidebarMenu>
+              {navItems.map((item) => {
+                const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                const Icon = item.icon;
+                
+                return (
+                  <SidebarMenuItem key={item.name}>
+                    <SidebarMenuButton isActive={isActive} tooltip={item.name} render={<Link href={item.href} />}>
+                      <Icon />
+                      <span>{item.name}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+
+        <SidebarFooter>
+          {developer && (
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground" />}>
+                    <Avatar className="h-8 w-8 rounded-lg">
+                      <AvatarFallback className="rounded-lg bg-primary/20 text-primary font-bold">{developer.email.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-semibold">{developer.email.split('@')[0]}</span>
+                      <span className="truncate text-xs">{developer.email}</span>
+                    </div>
+                    <ChevronsUpDown className="ml-auto size-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="end" sideOffset={4} className="w-(--anchor-width) min-w-56 rounded-lg">
+                    <Link href="/dashboard/profile" className="block w-full">
+                      <DropdownMenuItem>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sign Out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          )}
+        </SidebarFooter>
+      </Sidebar>
+
+      <main className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background shadow-sm z-10">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 h-4" />
+          <DynamicBreadcrumb />
+          <div className="flex-1" />
+          <ModeToggle />
+        </header>
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-muted/10">
           {children}
         </div>
       </main>
-    </div>
+    </SidebarProvider>
   );
 }

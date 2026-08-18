@@ -22,6 +22,7 @@ The auth landscape is typically split between heavy, complex open-source tools (
 - **Granular Registration Controls**: 
   - *Platform-Level*: Master admins can completely disable public developer registration to lock down the platform.
   - *Project-Level*: Developers can disable public end-user signups to create private, invite-only applications.
+- **Developer User Registration**: Developers can manually register end-users directly from their dashboard. The system automatically generates highly secure passwords, supports custom JSON metadata attachment, and offers one-click CSV export of user credentials.
 - **Premium "OLED" Aesthetic**: The entire platform features a stunning, modern "developer-first" true-black UI design, offering a cohesive and high-end experience out of the box.
 - **Developer Dashboard**: A centralized Next.js portal to manage projects, track user metrics, manage webhooks, and configure CORS domains.
 - **Admin Portal**: A super-admin interface to oversee all registered developers and enforce platform-wide settings.

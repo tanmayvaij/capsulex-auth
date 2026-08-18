@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, ShieldCheck, Users, Eye, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Users, Eye, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -68,165 +73,158 @@ export default function AdminProjectsPage() {
     <div className="w-full p-4 lg:p-6 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Global Projects</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Global Projects</h1>
           <p className="text-muted-foreground mt-1">Overview of all applications across the platform.</p>
         </div>
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input 
-            type="text"
+          <Input 
             placeholder="Search by project name or ID..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full pl-9 pr-4 py-2 bg-muted/20 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-all"
+            className="pl-9"
           />
         </div>
       </div>
 
-      <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm flex flex-col">
-        <div className="overflow-auto flex-1">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground uppercase bg-muted/20">
-              <tr>
-                <th scope="col" className="px-6 py-2.5 font-medium">ID</th>
-                <th scope="col" className="px-6 py-2.5 font-medium">Project</th>
-                <th scope="col" className="px-6 py-2.5 font-medium">Developer</th>
-                <th scope="col" className="px-6 py-2.5 font-medium">End Users</th>
-                <th scope="col" className="px-6 py-2.5 font-medium">Created</th>
-                <th scope="col" className="px-6 py-2.5 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
+      <Card className="flex flex-col">
+        <CardContent className="p-0 overflow-auto flex-1">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Project</TableHead>
+                <TableHead>Developer</TableHead>
+                <TableHead>End Users</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {paginatedProjects.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     {searchQuery ? "No projects match your search." : "No projects have been created yet."}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 paginatedProjects.map((project) => (
-                  <tr key={project.id} className="hover:bg-muted/10 transition-colors">
-                    <td className="px-6 py-2.5 font-mono text-xs text-muted-foreground">
+                  <TableRow key={project.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
                       {project.id}
-                    </td>
-                    <td className="px-6 py-2.5">
-                      <p className="font-semibold text-foreground">{project.name}</p>
-                    </td>
-                    <td className="px-6 py-2.5">
+                    </TableCell>
+                    <TableCell className="font-semibold">
+                      {project.name}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px] shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] shrink-0">
                           {(project.developer?.email || "U").charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-medium text-foreground text-xs truncate max-w-[150px]">{project.developer?.email || "Unknown"}</span>
+                        <span className="font-medium text-xs truncate max-w-[150px]">{project.developer?.email || "Unknown"}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-2.5">
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-2">
                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-medium text-foreground">{project.user_count || 0}</span>
+                        <span className="font-medium">{project.user_count || 0}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-2.5 text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
                       {new Date(project.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-2.5 text-right">
-                      <button
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => handleViewUsers(project)}
-                        className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full transition-all bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
-                        title="View End Users"
+                        className="h-8 rounded-full"
                       >
                         <Eye className="h-3 w-3 mr-1.5" /> Users
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </CardContent>
         
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-2.5 border-t border-border/40 bg-muted/5">
+          <div className="flex items-center justify-between px-6 py-3 border-t">
             <p className="text-sm text-muted-foreground">
               Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to <span className="font-medium text-foreground">{Math.min(startIndex + itemsPerPage, filteredProjects.length)}</span> of <span className="font-medium text-foreground">{filteredProjects.length}</span> projects
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg border border-border/50 text-sm font-medium hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
               >
-                <ChevronLeft className="h-4 w-4" /> Previous
-              </button>
-              <button
+                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg border border-border/50 text-sm font-medium hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
               >
-                Next <ChevronRight className="h-4 w-4" />
-              </button>
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* View Project Users Modal */}
-      {selectedProjectForUsers !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border/50 rounded-2xl max-w-2xl w-full shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between p-6 border-b border-border/50 bg-muted/10">
-              <div>
-                <h3 className="text-xl font-bold text-foreground">Users: {selectedProjectForUsers.name}</h3>
-                <p className="text-sm text-muted-foreground mt-1">Showing all end users registered in this project.</p>
+      <Dialog open={!!selectedProjectForUsers} onOpenChange={(open) => !open && setSelectedProjectForUsers(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Users: {selectedProjectForUsers?.name}</DialogTitle>
+            <DialogDescription>
+              Showing all end users registered in this project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {loadingUsers ? (
+              <div className="flex h-40 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-              <button 
-                onClick={() => setSelectedProjectForUsers(null)}
-                className="p-2 bg-muted hover:bg-muted/80 rounded-full transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            
-            <div className="p-0 overflow-auto flex-1">
-              {loadingUsers ? (
-                <div className="flex h-40 items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : (
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-muted-foreground uppercase bg-muted/20 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-2.5 font-medium">User ID</th>
-                      <th className="px-6 py-2.5 font-medium">Email</th>
-                      <th className="px-6 py-2.5 font-medium">Registered</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {projectUsers.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">
-                          No users registered in this project yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      projectUsers.map(user => (
-                        <tr key={user.id} className="hover:bg-muted/10 transition-colors">
-                          <td className="px-6 py-2.5 font-mono text-xs text-muted-foreground">{user.id}</td>
-                          <td className="px-6 py-2.5 font-medium text-foreground">{user.email}</td>
-                          <td className="px-6 py-2.5 text-xs text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User ID</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Registered</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {projectUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                        No users registered in this project yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    projectUsers.map(user => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{user.id}</TableCell>
+                        <TableCell className="font-medium">{user.email}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

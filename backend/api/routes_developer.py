@@ -307,7 +307,7 @@ async def create_project(
     await db.commit()
     await db.refresh(new_project)
     return new_project
-from schemas.user import UserResponse, UserStatusUpdate
+from schemas.user import UserResponse, UserStatusUpdate, UserCreate
 from models.user import User
 
 @developer_router.get("/projects/{project_id}/users", response_model=List[UserResponse])
@@ -333,6 +333,62 @@ async def get_project_users(
         .order_by(User.created_at.desc())
     )
     return result.scalars().all()
+
+@developer_router.post("/projects/{project_id}/users", response_model=UserResponse)
+async def create_project_user(
+    project_id: int,
+    user_in: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_dev: Developer = Depends(get_current_developer)
+) -> Any:
+    # First verify the project belongs to the developer
+    result = await db.execute(
+        select(Project).where(
+            (Project.id == project_id) & (Project.developer_id == current_dev.id)
+        )
+    )
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check if user email already exists for this project
+    existing = await db.execute(
+        select(User).where((User.project_id == project_id) & (User.email == user_in.email))
+    )
+    if existing.scalars().first():
+        raise HTTPException(status_code=400, detail="A user with this email already exists in this project.")
+
+    new_user = User(
+        email=user_in.email,
+        project_id=project_id,
+        hashed_password=get_password_hash(user_in.password),
+        is_active=True,
+        is_email_verified=True,
+        user_metadata=user_in.user_metadata or {}
+    )
+    
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    
+    # Eager load roles for response
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(select(User).options(selectinload(User.roles)).where(User.id == new_user.id))
+    new_user_with_roles = result.scalars().first()
+
+    # Trigger webhook
+    from services.webhook import WebhookService
+    user_data = UserResponse.model_validate(new_user_with_roles).model_dump()
+    user_data["created_at"] = user_data["created_at"].isoformat()
+    if user_data.get("last_signed_in"):
+        user_data["last_signed_in"] = user_data["last_signed_in"].isoformat()
+        
+    background_tasks.add_task(
+        WebhookService.dispatch_event,
+        db, project_id, "user.created", user_data
+    )
+
+    return new_user_with_roles
 
 @developer_router.delete("/projects/{project_id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project_user(
